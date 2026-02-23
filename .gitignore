@@ -29,3 +29,4 @@ lerna-debug.log*
 coverage
 playwright-report
 test-results
+.next

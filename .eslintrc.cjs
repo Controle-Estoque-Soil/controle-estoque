@@ -8,6 +8,9 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 'latest',
     sourceType: 'module',
+    ecmaFeatures: {
+      jsx: true,
+    },
   },
   plugins: ['@typescript-eslint'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
@@ -17,6 +20,13 @@ module.exports = {
       files: ['*.cjs'],
       parserOptions: {
         sourceType: 'script',
+      },
+    },
+    {
+      files: ['apps/web/**/*.{ts,tsx}'],
+      env: {
+        browser: true,
+        node: false,
       },
     },
   ],
