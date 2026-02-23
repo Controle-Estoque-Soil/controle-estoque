@@ -1,0 +1,51 @@
+import { z } from 'zod';
+
+const nonNegativeDecimalStringSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+(\.\d+)?$/, 'Invalid non-negative decimal value');
+
+export const productIdParamsSchema = z.object({
+  id: z.string().min(1),
+});
+
+export const productCreateBodySchema = z.object({
+  name: z.string().min(1).max(150),
+  sku: z.string().min(1).max(80),
+  active: z.boolean().optional().default(true),
+});
+
+export type ProductCreateBody = z.infer<typeof productCreateBodySchema>;
+
+export const productUpdateBodySchema = z
+  .object({
+    name: z.string().min(1).max(150).optional(),
+    sku: z.string().min(1).max(80).optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, 'At least one field is required');
+
+export type ProductUpdateBody = z.infer<typeof productUpdateBodySchema>;
+
+export const productListQuerySchema = z.object({
+  search: z.string().trim().optional(),
+  active: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
+});
+
+export type ProductListQuery = z.infer<typeof productListQuerySchema>;
+
+export const productBomReplaceBodySchema = z.object({
+  items: z.array(
+    z.object({
+      itemId: z.string().min(1),
+      qtyRequired: nonNegativeDecimalStringSchema.refine((value) => !/^0(?:\.0+)?$/.test(value), {
+        message: 'qtyRequired must be greater than zero',
+      }),
+    }),
+  ),
+});
+
+export type ProductBomReplaceBody = z.infer<typeof productBomReplaceBodySchema>;
