@@ -1,0 +1,75 @@
+name: Release Containers
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - app: api
+            image: ghcr.io/${{ github.repository_owner }}/controle-estoque-api
+            dockerfile: apps/api/Dockerfile
+            build_args: ''
+          - app: web
+            image: ghcr.io/${{ github.repository_owner }}/controle-estoque-web
+            dockerfile: apps/web/Dockerfile
+            build_args: NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build_args }}
+
+      # AWS deploy placeholder (ECS/EC2):
+      # - Configure AWS credentials (aws-actions/configure-aws-credentials)
+      # - Update ECS task definition image tag for API
+      # - Run ecs deploy service update / force new deployment
+      # - RDS is provisioned separately; set DATABASE_URL secret in task definition
+
+      # Vercel deploy placeholder (frontend alternative to container):
+      # - npm i -g vercel
+      # - vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+      # - vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
+      # - vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }}
