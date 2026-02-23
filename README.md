@@ -1,1 +1,3 @@
-# controle-estoque
+# Controle de Estoque
+
+Monorepo em construção.

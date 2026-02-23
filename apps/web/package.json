@@ -1,0 +1,10 @@
+{
+  "name": "@controle/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": "node -e \"console.log('web lint placeholder')\"",
+    "typecheck": "node -e \"console.log('web typecheck placeholder')\"",
+    "test:e2e": "node -e \"console.log('web e2e placeholder')\""
+  }
+}

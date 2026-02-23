@@ -1,0 +1,10 @@
+{
+  "name": "@controle/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": "node -e \"console.log('api lint placeholder')\"",
+    "typecheck": "node -e \"console.log('api typecheck placeholder')\"",
+    "test:unit": "node -e \"console.log('api unit placeholder')\""
+  }
+}
