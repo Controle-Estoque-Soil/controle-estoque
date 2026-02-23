@@ -6,6 +6,7 @@ import { apiErrorHandler } from './core/error-handler';
 import { authRoutes } from './modules/auth/auth.routes';
 import { healthRoutes } from './modules/health/health.routes';
 import { itemsRoutes } from './modules/items/items.routes';
+import { operationsRoutes } from './modules/operations/operations.routes';
 import { productsRoutes } from './modules/products/products.routes';
 import { authPlugin } from './plugins/auth';
 import { prismaPlugin } from './plugins/prisma';
@@ -37,6 +38,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   await app.register(authRoutes, { prefix: '/auth' });
   await app.register(itemsRoutes);
   await app.register(productsRoutes);
+  await app.register(operationsRoutes);
 
   return app;
 }
