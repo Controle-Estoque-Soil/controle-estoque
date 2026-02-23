@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum OperationType {
+  INBOUND_PRODUCT
+  OUTBOUND_PRODUCT
+}
+
+enum StockMovementReason {
+  MANUAL_ADJUSTMENT
+  PRODUCT_INBOUND
+  PRODUCT_OUTBOUND
+}
+
+enum StockMovementReferenceType {
+  PRODUCT_ORDER
+  MANUAL_ADJUSTMENT
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  passwordHash String          @map("password_hash")
+  role         Role
+  createdAt    DateTime        @default(now()) @map("created_at")
+  movements    StockMovement[] @relation("movement_created_by")
+  orders       ProductOrder[]  @relation("order_created_by")
+
+  @@map("users")
+}
+
+model Item {
+  id           String             @id @default(cuid())
+  name         String
+  sku          String             @unique
+  unit         String
+  unitPrice    Decimal            @db.Decimal(18, 6) @map("unit_price")
+  qtyOnHand    Decimal            @db.Decimal(18, 6) @default(0) @map("qty_on_hand")
+  minQty       Decimal?           @db.Decimal(18, 6) @map("min_qty")
+  active       Boolean            @default(true)
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  bomItems     ProductBomItem[]
+  movements    StockMovement[]
+  orderLines   ProductOrderLine[]
+
+  @@index([active])
+  @@index([name])
+  @@map("items")
+}
+
+model Product {
+  id        String           @id @default(cuid())
+  name      String
+  sku       String           @unique
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  bomItems  ProductBomItem[]
+  orders    ProductOrder[]
+
+  @@index([active])
+  @@index([name])
+  @@map("products")
+}
+
+model ProductBomItem {
+  id          String  @id @default(cuid())
+  productId   String  @map("product_id")
+  itemId      String  @map("item_id")
+  qtyRequired Decimal @db.Decimal(18, 6) @map("qty_required")
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  item        Item    @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, itemId])
+  @@index([itemId])
+  @@map("product_bom_items")
+}
+
+model StockMovement {
+  id              String                     @id @default(cuid())
+  itemId          String                     @map("item_id")
+  deltaQty        Decimal                    @db.Decimal(18, 6) @map("delta_qty")
+  reason          StockMovementReason
+  referenceType   StockMovementReferenceType @map("reference_type")
+  referenceId     String?                    @map("reference_id")
+  note            String?
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  createdByUserId String                     @map("created_by_user_id")
+  item            Item                       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  createdByUser   User                       @relation("movement_created_by", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([itemId, createdAt])
+  @@index([createdAt])
+  @@index([referenceType, referenceId])
+  @@map("stock_movements")
+}
+
+model ProductOrder {
+  id              String             @id @default(cuid())
+  type            OperationType
+  productId       String             @map("product_id")
+  productQty      Decimal            @db.Decimal(18, 6) @map("product_qty")
+  totalCost       Decimal?           @db.Decimal(18, 6) @map("total_cost")
+  unitCost        Decimal?           @db.Decimal(18, 6) @map("unit_cost")
+  note            String?
+  createdAt       DateTime           @default(now()) @map("created_at")
+  createdByUserId String             @map("created_by_user_id")
+  product         Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdByUser   User               @relation("order_created_by", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  lines           ProductOrderLine[]
+
+  @@index([productId, createdAt])
+  @@index([type, createdAt])
+  @@index([createdAt])
+  @@map("product_orders")
+}
+
+model ProductOrderLine {
+  id                    String       @id @default(cuid())
+  orderId               String       @map("order_id")
+  itemId                String       @map("item_id")
+  itemQty               Decimal      @db.Decimal(18, 6) @map("item_qty")
+  itemUnitPriceSnapshot Decimal      @db.Decimal(18, 6) @map("item_unit_price_snapshot")
+  lineCost              Decimal      @db.Decimal(18, 6) @map("line_cost")
+  order                 ProductOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item                  Item         @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([itemId])
+  @@index([orderId])
+  @@map("product_order_lines")
+}

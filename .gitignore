@@ -1,7 +1,7 @@
 # Nestjs specific
-/dist
-/node_modules
-/build
+dist
+node_modules
+build
 /tmp
 
 # Logs
@@ -22,3 +22,10 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+
+# Build/test caches
+*.tsbuildinfo
+.turbo
+coverage
+playwright-report
+test-results

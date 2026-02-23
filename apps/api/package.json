@@ -2,9 +2,39 @@
   "name": "@controle/api",
   "version": "0.1.0",
   "private": true,
+  "main": "dist/index.js",
   "scripts": {
-    "lint": "node -e \"console.log('api lint placeholder')\"",
-    "typecheck": "node -e \"console.log('api typecheck placeholder')\"",
-    "test:unit": "node -e \"console.log('api unit placeholder')\""
+    "dev": "tsx watch src/index.ts",
+    "prebuild": "prisma generate",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "lint": "eslint src tests prisma --ext .ts",
+    "pretypecheck": "prisma generate",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest:unit": "prisma generate",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@controle/shared": "file:../../packages/shared",
+    "@fastify/cors": "^10.0.1",
+    "@fastify/jwt": "^9.0.1",
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "fastify-plugin": "^5.0.1",
+    "pino-pretty": "^11.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.10.2",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
   }
 }

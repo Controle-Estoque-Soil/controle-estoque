@@ -12,8 +12,9 @@
   "scripts": {
     "lint": "eslint . --ext .ts,.tsx,.js,.cjs,.mjs --max-warnings=0",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "node scripts/noop-check.mjs unit",
+    "test:unit": "npm run test:unit --workspaces --if-present",
     "test:e2e": "node scripts/noop-check.mjs e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
