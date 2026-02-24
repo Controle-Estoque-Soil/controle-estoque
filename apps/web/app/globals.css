@@ -527,6 +527,111 @@ a {
   box-shadow: 0 4px 12px rgba(16, 35, 25, 0.06);
 }
 
+.selector-stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.selector-group {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.95rem;
+  background: rgba(245, 252, 248, 0.9);
+}
+
+.selector-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.selector-group-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.choice-grid {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.choice-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.choice-card {
+  display: grid;
+  gap: 0.25rem;
+  text-align: left;
+  width: 100%;
+  border: 1px solid rgba(22, 101, 52, 0.16);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text);
+  border-radius: 0.9rem;
+  padding: 0.85rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease, background-color 120ms ease;
+}
+
+.choice-card:hover {
+  border-color: rgba(22, 101, 52, 0.28);
+  box-shadow: 0 6px 14px rgba(16, 35, 25, 0.06);
+}
+
+.choice-card:focus-visible {
+  outline: 2px solid rgba(22, 101, 52, 0.34);
+  outline-offset: 2px;
+}
+
+.choice-card.active {
+  border-color: rgba(22, 101, 52, 0.42);
+  background: linear-gradient(180deg, rgba(236, 253, 244, 0.95), rgba(247, 253, 250, 0.95));
+  box-shadow: 0 10px 22px rgba(16, 35, 25, 0.08);
+}
+
+.choice-card.compact {
+  min-height: 92px;
+}
+
+.choice-card.success-tone.active {
+  border-color: rgba(21, 128, 61, 0.34);
+  background: linear-gradient(180deg, rgba(220, 252, 231, 0.95), rgba(245, 253, 248, 0.95));
+}
+
+.choice-card.danger-tone.active {
+  border-color: rgba(220, 38, 38, 0.26);
+  background: linear-gradient(180deg, rgba(220, 252, 231, 0.95), rgba(247, 253, 250, 0.95));
+}
+
+.choice-card-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 101, 52, 0.14);
+  color: #166534;
+  background: rgba(240, 253, 244, 0.9);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.choice-card-title {
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.choice-card-meta {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.25;
+}
+
 .stepper {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -567,6 +672,16 @@ a {
   .modal-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .selector-group-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+  }
+
+  .choice-grid.two {
+    grid-template-columns: 1fr;
   }
 }
 

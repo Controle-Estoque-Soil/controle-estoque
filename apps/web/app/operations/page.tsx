@@ -401,56 +401,76 @@ export default function OperationsPage() {
           {error ? <p className="inline-error">{error}</p> : null}
           {success ? <p className="inline-success">{success}</p> : null}
           <form className="grid" onSubmit={handlePreview}>
-            <div className="actions">
-              <button
-                type="button"
-                className={mode === 'outbound' ? 'button' : 'button ghost'}
-                onClick={() => {
-                  setMode('outbound');
-                  setProductPreview(null);
-                  setItemPreview(null);
-                }}
-              >
-                Registrar saida (OUTBOUND)
-              </button>
-              <button
-                type="button"
-                className={mode === 'inbound' ? 'button secondary' : 'button ghost'}
-                onClick={() => {
-                  setMode('inbound');
-                  setProductPreview(null);
-                  setItemPreview(null);
-                }}
-              >
-                Registrar entrada (INBOUND)
-              </button>
-            </div>
+            <div className="selector-stack">
+              <div className="selector-group">
+                <div className="selector-group-head">
+                  <h3>Tipo da operacao</h3>
+                  <span className="small">Define se entra ou sai estoque</span>
+                </div>
+                <div className="choice-grid two">
+                  <button
+                    type="button"
+                    className={`choice-card ${mode === 'outbound' ? 'active danger-tone' : ''}`}
+                    onClick={() => {
+                      setMode('outbound');
+                      setProductPreview(null);
+                      setItemPreview(null);
+                    }}
+                  >
+                    <span className="choice-card-badge">Saida</span>
+                    <span className="choice-card-title">Registrar saida</span>
+                    <span className="choice-card-meta">Debita estoque de itens (direto) ou via BOM de produto.</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`choice-card ${mode === 'inbound' ? 'active success-tone' : ''}`}
+                    onClick={() => {
+                      setMode('inbound');
+                      setProductPreview(null);
+                      setItemPreview(null);
+                    }}
+                  >
+                    <span className="choice-card-badge">Entrada</span>
+                    <span className="choice-card-title">Registrar entrada</span>
+                    <span className="choice-card-meta">Credita estoque de itens (direto) ou via BOM de produto.</span>
+                  </button>
+                </div>
+              </div>
 
-            <div className="actions">
-              <button
-                type="button"
-                className={target === 'product' ? 'button ghost active-pill' : 'button ghost'}
-                onClick={() => {
-                  setTarget('product');
-                  setError(null);
-                  setSuccess(null);
-                  setItemPreview(null);
-                }}
-              >
-                Operacao por produto
-              </button>
-              <button
-                type="button"
-                className={target === 'item' ? 'button ghost active-pill' : 'button ghost'}
-                onClick={() => {
-                  setTarget('item');
-                  setError(null);
-                  setSuccess(null);
-                  setProductPreview(null);
-                }}
-              >
-                Operacao por item
-              </button>
+              <div className="selector-group">
+                <div className="selector-group-head">
+                  <h3>Aplicar em</h3>
+                  <span className="small">Escolha se a operacao sera por produto ou item</span>
+                </div>
+                <div className="choice-grid two">
+                  <button
+                    type="button"
+                    className={`choice-card compact ${target === 'product' ? 'active' : ''}`}
+                    onClick={() => {
+                      setTarget('product');
+                      setError(null);
+                      setSuccess(null);
+                      setItemPreview(null);
+                    }}
+                  >
+                    <span className="choice-card-title">Produto</span>
+                    <span className="choice-card-meta">Usa BOM/receita e mostra custo calculado no preview.</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`choice-card compact ${target === 'item' ? 'active' : ''}`}
+                    onClick={() => {
+                      setTarget('item');
+                      setError(null);
+                      setSuccess(null);
+                      setProductPreview(null);
+                    }}
+                  >
+                    <span className="choice-card-title">Item</span>
+                    <span className="choice-card-meta">Movimentacao direta de item (ajuste), com nota obrigatoria.</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {target === 'item' && user?.role !== 'ADMIN' ? (
