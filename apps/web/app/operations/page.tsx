@@ -437,15 +437,17 @@ export default function OperationsPage() {
                 </div>
               </div>
 
-              <div className="selector-group">
+              <div className="field">
                 <div className="selector-group-head">
-                  <h3>Aplicar em</h3>
-                  <span className="small">Escolha se a operacao sera por produto ou item</span>
+                  <label>Aplicar em</label>
+                  <span className="small">Selecao obrigatoria</span>
                 </div>
-                <div className="choice-grid two">
+                <div className="segmented" role="tablist" aria-label="Aplicar em">
                   <button
                     type="button"
-                    className={`choice-card compact ${target === 'product' ? 'active' : ''}`}
+                    role="tab"
+                    aria-selected={target === 'product'}
+                    className={`segmented-button ${target === 'product' ? 'active' : ''}`}
                     onClick={() => {
                       setTarget('product');
                       setError(null);
@@ -453,12 +455,13 @@ export default function OperationsPage() {
                       setItemPreview(null);
                     }}
                   >
-                    <span className="choice-card-title">Produto</span>
-                    <span className="choice-card-meta">Usa BOM/receita e mostra custo calculado no preview.</span>
+                    Produto
                   </button>
                   <button
                     type="button"
-                    className={`choice-card compact ${target === 'item' ? 'active' : ''}`}
+                    role="tab"
+                    aria-selected={target === 'item'}
+                    className={`segmented-button ${target === 'item' ? 'active' : ''}`}
                     onClick={() => {
                       setTarget('item');
                       setError(null);
@@ -466,8 +469,7 @@ export default function OperationsPage() {
                       setProductPreview(null);
                     }}
                   >
-                    <span className="choice-card-title">Item</span>
-                    <span className="choice-card-meta">Movimentacao direta de item (ajuste), com nota obrigatoria.</span>
+                    Item
                   </button>
                 </div>
               </div>
