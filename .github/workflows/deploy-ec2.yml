@@ -1,0 +1,172 @@
+name: Deploy EC2 (Build on Server)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inventory-ec2-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-ec2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Prepare SSH
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+          AWS_EC2_SSH_KEY: ${{ secrets.AWS_EC2_SSH_KEY }}
+          AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          test -n "${AWS_EC2_HOST}"
+          test -n "${AWS_EC2_USER}"
+          test -n "${AWS_EC2_SSH_KEY}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${AWS_EC2_SSH_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${AWS_EC2_SSH_PORT:-22}" "${AWS_EC2_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Generate production env file (for EC2)
+        env:
+          PROD_COMPOSE_PROJECT_NAME: ${{ secrets.PROD_COMPOSE_PROJECT_NAME }}
+          PROD_API_PORT: ${{ secrets.PROD_API_PORT }}
+          PROD_PROXY_HTTP_PORT: ${{ secrets.PROD_PROXY_HTTP_PORT }}
+          PROD_PROXY_HTTPS_PORT: ${{ secrets.PROD_PROXY_HTTPS_PORT }}
+          PROD_POSTGRES_DB: ${{ secrets.PROD_POSTGRES_DB }}
+          PROD_POSTGRES_USER: ${{ secrets.PROD_POSTGRES_USER }}
+          PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+          PROD_BCRYPT_SALT_ROUNDS: ${{ secrets.PROD_BCRYPT_SALT_ROUNDS }}
+          PROD_CORS_ORIGINS: ${{ secrets.PROD_CORS_ORIGINS }}
+          PROD_TRUST_PROXY: ${{ secrets.PROD_TRUST_PROXY }}
+          PROD_LOG_LEVEL: ${{ secrets.PROD_LOG_LEVEL }}
+          PROD_ENABLE_SECURITY_HEADERS: ${{ secrets.PROD_ENABLE_SECURITY_HEADERS }}
+          PROD_SEED_ADMIN_EMAIL: ${{ secrets.PROD_SEED_ADMIN_EMAIL }}
+          PROD_SEED_ADMIN_PASSWORD: ${{ secrets.PROD_SEED_ADMIN_PASSWORD }}
+          PROD_DOMAIN_API: ${{ secrets.PROD_DOMAIN_API }}
+          PROD_TLS_EMAIL: ${{ secrets.PROD_TLS_EMAIL }}
+        run: |
+          set -euo pipefail
+          mkdir -p .deploy-tmp
+          cat > .deploy-tmp/.env.prod <<EOF
+          COMPOSE_PROJECT_NAME=${PROD_COMPOSE_PROJECT_NAME:-inventory}
+          INVENTORY_API_PORT=${PROD_API_PORT:-8087}
+          INVENTORY_PROXY_HTTP_PORT=${PROD_PROXY_HTTP_PORT:-18080}
+          INVENTORY_PROXY_HTTPS_PORT=${PROD_PROXY_HTTPS_PORT:-18443}
+          INVENTORY_POSTGRES_DB=${PROD_POSTGRES_DB:-inventory_prod}
+          INVENTORY_POSTGRES_USER=${PROD_POSTGRES_USER:-inventory}
+          INVENTORY_POSTGRES_PASSWORD=${PROD_POSTGRES_PASSWORD}
+          INVENTORY_DATABASE_URL=${PROD_DATABASE_URL}
+          INVENTORY_JWT_SECRET=${PROD_JWT_SECRET}
+          INVENTORY_BCRYPT_SALT_ROUNDS=${PROD_BCRYPT_SALT_ROUNDS:-12}
+          INVENTORY_CORS_ORIGINS=${PROD_CORS_ORIGINS}
+          INVENTORY_TRUST_PROXY=${PROD_TRUST_PROXY:-true}
+          INVENTORY_LOG_LEVEL=${PROD_LOG_LEVEL:-info}
+          INVENTORY_ENABLE_SECURITY_HEADERS=${PROD_ENABLE_SECURITY_HEADERS:-true}
+          INVENTORY_SEED_ADMIN_EMAIL=${PROD_SEED_ADMIN_EMAIL}
+          INVENTORY_SEED_ADMIN_PASSWORD=${PROD_SEED_ADMIN_PASSWORD}
+          INVENTORY_DOMAIN_API=${PROD_DOMAIN_API}
+          INVENTORY_TLS_EMAIL=${PROD_TLS_EMAIL}
+          EOF
+          test -s .deploy-tmp/.env.prod
+
+      - name: Sync repo on EC2 (safe update)
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+          AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_DEPLOY_PATH: ${{ secrets.AWS_EC2_DEPLOY_PATH }}
+          REPOSITORY: ${{ github.repository }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${AWS_EC2_DEPLOY_PATH:-/opt/inventory-app}"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-22}"
+          ssh -p "${SSH_PORT}" "${AWS_EC2_USER}@${AWS_EC2_HOST}" "bash -lc '
+            set -euo pipefail
+            mkdir -p \"${DEPLOY_PATH}\"
+            if [ ! -d \"${DEPLOY_PATH}/.git\" ]; then
+              git clone https://github.com/${REPOSITORY}.git \"${DEPLOY_PATH}\"
+            fi
+            cd \"${DEPLOY_PATH}\"
+            if git rev-parse --verify HEAD >/dev/null 2>&1; then
+              git rev-parse HEAD > .previous_deploy_sha
+            fi
+            git fetch --all --tags --prune origin
+            git checkout main
+            git reset --hard ${DEPLOY_SHA}
+            echo ${DEPLOY_SHA} > .current_deploy_sha
+          '"
+
+      - name: Upload .env.prod to EC2
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+          AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_DEPLOY_PATH: ${{ secrets.AWS_EC2_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${AWS_EC2_DEPLOY_PATH:-/opt/inventory-app}"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-22}"
+          scp -P "${SSH_PORT}" .deploy-tmp/.env.prod "${AWS_EC2_USER}@${AWS_EC2_HOST}:${DEPLOY_PATH}/deploy/aws-ec2/.env.prod"
+
+      - name: Build on EC2, migrate and restart inventory services
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+          AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_DEPLOY_PATH: ${{ secrets.AWS_EC2_DEPLOY_PATH }}
+          PROD_ENABLE_PROXY_PROFILE: ${{ secrets.PROD_ENABLE_PROXY_PROFILE }}
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${AWS_EC2_DEPLOY_PATH:-/opt/inventory-app}"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-22}"
+          ENABLE_PROXY="${PROD_ENABLE_PROXY_PROFILE:-false}"
+          ssh -p "${SSH_PORT}" "${AWS_EC2_USER}@${AWS_EC2_HOST}" "ENABLE_PROXY='${ENABLE_PROXY}' DEPLOY_PATH='${DEPLOY_PATH}' bash -lc '
+            set -euo pipefail
+            cd \"${DEPLOY_PATH}\"
+            COMPOSE=\"docker compose --env-file deploy/aws-ec2/.env.prod -f deploy/aws-ec2/docker-compose.prod.yml\"
+            \$COMPOSE up -d inventory-postgres
+            \$COMPOSE build inventory-api
+            \$COMPOSE run --rm inventory-api npm run prisma:migrate:deploy
+            \$COMPOSE up -d inventory-api
+            if [ \"\${ENABLE_PROXY}\" = \"true\" ]; then
+              \$COMPOSE --profile proxy up -d inventory-proxy
+            fi
+          '"
+
+      - name: Post-deploy healthcheck (EC2 local API)
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+          AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_DEPLOY_PATH: ${{ secrets.AWS_EC2_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${AWS_EC2_DEPLOY_PATH:-/opt/inventory-app}"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-22}"
+          ssh -p "${SSH_PORT}" "${AWS_EC2_USER}@${AWS_EC2_HOST}" "DEPLOY_PATH='${DEPLOY_PATH}' bash -lc '
+            set -euo pipefail
+            cd \"${DEPLOY_PATH}\"
+            API_PORT=\$(grep \"^INVENTORY_API_PORT=\" deploy/aws-ec2/.env.prod | cut -d= -f2)
+            API_PORT=\${API_PORT:-8087}
+            for i in \$(seq 1 20); do
+              if curl -fsS \"http://127.0.0.1:\${API_PORT}/health\" >/dev/null; then
+                exit 0
+              fi
+              sleep 3
+            done
+            echo \"Healthcheck failed on port \${API_PORT}\" >&2
+            exit 1
+          '"
+
+      - name: Cleanup local deploy temp files
+        if: always()
+        run: rm -rf .deploy-tmp
