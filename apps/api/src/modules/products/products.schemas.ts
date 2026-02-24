@@ -5,13 +5,17 @@ const nonNegativeDecimalStringSchema = z
   .trim()
   .regex(/^\d+(\.\d+)?$/, 'Invalid non-negative decimal value');
 
+const optionalSkuSchema = z
+  .union([z.string().trim().max(80), z.literal('')])
+  .optional();
+
 export const productIdParamsSchema = z.object({
   id: z.string().min(1),
 });
 
 export const productCreateBodySchema = z.object({
   name: z.string().min(1).max(150),
-  sku: z.string().min(1).max(80),
+  sku: optionalSkuSchema,
   active: z.boolean().optional().default(true),
 });
 
@@ -20,7 +24,7 @@ export type ProductCreateBody = z.infer<typeof productCreateBodySchema>;
 export const productUpdateBodySchema = z
   .object({
     name: z.string().min(1).max(150).optional(),
-    sku: z.string().min(1).max(80).optional(),
+    sku: optionalSkuSchema,
     active: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, 'At least one field is required');

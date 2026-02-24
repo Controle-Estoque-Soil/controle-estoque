@@ -126,7 +126,6 @@ export default function ItemsPage() {
         token,
         body: {
           ...parsed,
-          minQty: parsed.minQty === '' ? null : parsed.minQty,
         },
       });
       setCreateForm(emptyItemForm());
@@ -162,7 +161,7 @@ export default function ItemsPage() {
           sku: parsed.sku,
           unit: parsed.unit,
           unitPrice: parsed.unitPrice,
-          minQty: parsed.minQty === '' ? null : parsed.minQty,
+          minQty: parsed.minQty,
           active: parsed.active,
         },
       });
@@ -397,8 +396,13 @@ export default function ItemsPage() {
                 <input className="input" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
               </div>
               <div className="field">
-                <label>SKU</label>
-                <input className="input" value={createForm.sku} onChange={(e) => setCreateForm({ ...createForm, sku: e.target.value })} />
+                <label>SKU (opcional)</label>
+                <input
+                  className="input"
+                  placeholder="Gerado automaticamente se vazio"
+                  value={createForm.sku}
+                  onChange={(e) => setCreateForm({ ...createForm, sku: e.target.value })}
+                />
               </div>
               <div className="field">
                 <label>Unidade</label>
@@ -413,7 +417,7 @@ export default function ItemsPage() {
                 <input className="input" value={createForm.qtyOnHand} onChange={(e) => setCreateForm({ ...createForm, qtyOnHand: e.target.value })} />
               </div>
               <div className="field">
-                <label>Estoque mínimo (opcional)</label>
+                <label>Estoque minimo</label>
                 <input className="input" value={createForm.minQty} onChange={(e) => setCreateForm({ ...createForm, minQty: e.target.value })} />
               </div>
               <div className="field full checkbox-row">
@@ -445,8 +449,13 @@ export default function ItemsPage() {
                     <input className="input" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
                   </div>
                   <div className="field">
-                    <label>SKU</label>
-                    <input className="input" value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} />
+                    <label>SKU (opcional)</label>
+                    <input
+                      className="input"
+                      placeholder="Mantem o SKU atual se vazio"
+                      value={editForm.sku}
+                      onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })}
+                    />
                   </div>
                   <div className="field">
                     <label>Unidade</label>
@@ -461,7 +470,7 @@ export default function ItemsPage() {
                     <input className="input" value={detail.item.qtyOnHand} readOnly />
                   </div>
                   <div className="field">
-                    <label>Estoque mínimo</label>
+                    <label>Estoque minimo</label>
                     <input className="input" value={editForm.minQty} onChange={(e) => setEditForm({ ...editForm, minQty: e.target.value })} />
                   </div>
                   <div className="field full checkbox-row">

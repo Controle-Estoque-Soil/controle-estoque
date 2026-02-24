@@ -2,17 +2,17 @@ import { z } from 'zod';
 
 export const itemFormSchema = z.object({
   name: z.string().min(1, 'Nome e obrigatorio'),
-  sku: z.string().min(1, 'SKU e obrigatorio'),
+  sku: z.string().trim().max(80, 'SKU invalido'),
   unit: z.string().min(1, 'Unidade e obrigatoria'),
   unitPrice: z.string().regex(/^\d+(\.\d+)?$/, 'Preco invalido'),
   qtyOnHand: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invalida').default('0'),
-  minQty: z.string().regex(/^\d+(\.\d+)?$/, 'Estoque minimo invalido').optional().or(z.literal('')),
+  minQty: z.string().regex(/^\d+(\.\d+)?$/, 'Estoque minimo invalido'),
   active: z.boolean().default(true),
 });
 
 export const productFormSchema = z.object({
   name: z.string().min(1, 'Nome e obrigatorio'),
-  sku: z.string().min(1, 'SKU e obrigatorio'),
+  sku: z.string().trim().max(80, 'SKU invalido'),
   active: z.boolean().default(true),
 });
 

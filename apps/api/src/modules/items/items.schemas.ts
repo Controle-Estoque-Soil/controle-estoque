@@ -10,17 +10,21 @@ const nonNegativeDecimalStringSchema = z
   .trim()
   .regex(/^\d+(\.\d+)?$/, 'Invalid non-negative decimal value');
 
+const optionalSkuSchema = z
+  .union([z.string().trim().max(80), z.literal('')])
+  .optional();
+
 export const itemIdParamsSchema = z.object({
   id: z.string().min(1),
 });
 
 export const itemCreateBodySchema = z.object({
   name: z.string().min(1).max(150),
-  sku: z.string().min(1).max(80),
+  sku: optionalSkuSchema,
   unit: z.string().min(1).max(20),
   unitPrice: nonNegativeDecimalStringSchema,
   qtyOnHand: nonNegativeDecimalStringSchema.default('0'),
-  minQty: nonNegativeDecimalStringSchema.nullable().optional(),
+  minQty: nonNegativeDecimalStringSchema,
   active: z.boolean().optional().default(true),
 });
 
@@ -29,7 +33,7 @@ export type ItemCreateBody = z.infer<typeof itemCreateBodySchema>;
 export const itemUpdateBodySchema = z
   .object({
     name: z.string().min(1).max(150).optional(),
-    sku: z.string().min(1).max(80).optional(),
+    sku: optionalSkuSchema,
     unit: z.string().min(1).max(20).optional(),
     unitPrice: nonNegativeDecimalStringSchema.optional(),
     minQty: nonNegativeDecimalStringSchema.nullable().optional(),

@@ -1,10 +1,16 @@
+import { randomUUID } from 'node:crypto';
 import { appErrors } from '../../core/app-error';
 import { decimalToString, toDecimal } from '../../utils/decimal';
 import type { ProductBomReplaceBody, ProductCreateBody, ProductListQuery, ProductUpdateBody } from './products.schemas';
 import { ProductsRepository } from './products.repository';
 
-function normalizeSku(sku: string): string {
-  return sku.trim().toUpperCase();
+function normalizeSku(sku?: string | null): string | undefined {
+  const normalized = sku?.trim().toUpperCase();
+  return normalized ? normalized : undefined;
+}
+
+function generateAutoSku(prefix: 'PRD'): string {
+  return `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 }
 
 function serializeProduct(product: {
@@ -68,7 +74,7 @@ export class ProductsService {
   async create(input: ProductCreateBody) {
     const product = await this.productsRepository.create({
       name: input.name.trim(),
-      sku: normalizeSku(input.sku),
+      sku: normalizeSku(input.sku) ?? generateAutoSku('PRD'),
       active: input.active ?? true,
     });
 
@@ -83,7 +89,7 @@ export class ProductsService {
 
     const product = await this.productsRepository.update(id, {
       name: input.name?.trim(),
-      sku: input.sku ? normalizeSku(input.sku) : undefined,
+      sku: normalizeSku(input.sku),
       active: input.active,
     });
 

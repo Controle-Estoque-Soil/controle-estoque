@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 
 import { appErrors } from '../../core/app-error';
@@ -34,8 +35,13 @@ export interface ItemMovementResponse {
   };
 }
 
-function normalizeSku(sku: string): string {
-  return sku.trim().toUpperCase();
+function normalizeSku(sku?: string | null): string | undefined {
+  const normalized = sku?.trim().toUpperCase();
+  return normalized ? normalized : undefined;
+}
+
+function generateAutoSku(prefix: 'ITM'): string {
+  return `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 }
 
 function serializeItem(item: {
@@ -130,7 +136,7 @@ export class ItemsService {
   async create(input: ItemCreateBody, actor: JwtUserPayload): Promise<ItemResponse> {
     const qtyOnHand = toDecimal(input.qtyOnHand);
     const unitPrice = toDecimal(input.unitPrice);
-    const minQty = input.minQty == null ? null : toDecimal(input.minQty);
+    const minQty = toDecimal(input.minQty);
 
     if (qtyOnHand.isNegative()) {
       throw appErrors.badRequest('qtyOnHand must be non-negative');
@@ -144,7 +150,7 @@ export class ItemsService {
       const created = await this.itemsRepository.create(
         {
           name: input.name.trim(),
-          sku: normalizeSku(input.sku),
+          sku: normalizeSku(input.sku) ?? generateAutoSku('ITM'),
           unit: input.unit.trim(),
           unitPrice,
           qtyOnHand,
@@ -182,7 +188,7 @@ export class ItemsService {
 
     const updated = await this.itemsRepository.update(id, {
       name: input.name?.trim(),
-      sku: input.sku ? normalizeSku(input.sku) : undefined,
+      sku: normalizeSku(input.sku),
       unit: input.unit?.trim(),
       unitPrice: input.unitPrice ? toDecimal(input.unitPrice) : undefined,
       minQty:

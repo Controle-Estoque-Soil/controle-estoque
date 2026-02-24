@@ -383,10 +383,11 @@ export default function ProductsPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="create-product-sku">SKU</label>
+                <label htmlFor="create-product-sku">SKU (opcional)</label>
                 <input
                   id="create-product-sku"
                   className="input"
+                  placeholder="Gerado automaticamente se vazio"
                   value={createForm.sku}
                   onChange={(e) => setCreateForm({ ...createForm, sku: e.target.value })}
                 />
@@ -425,10 +426,11 @@ export default function ProductsPage() {
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="edit-product-sku">SKU</label>
+                    <label htmlFor="edit-product-sku">SKU (opcional)</label>
                     <input
                       id="edit-product-sku"
                       className="input"
+                      placeholder="Mantem o SKU atual se vazio"
                       value={editForm.sku}
                       onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })}
                     />
