@@ -1,0 +1,22 @@
+{
+	email {$INVENTORY_TLS_EMAIL}
+}
+
+{$INVENTORY_DOMAIN_API} {
+	encode zstd gzip
+
+	@health path /health
+	handle @health {
+		reverse_proxy inventory-api:3333
+	}
+
+	handle {
+		reverse_proxy inventory-api:3333
+	}
+}
+
+# Bootstrap / conflict-safe fallback:
+# If 80/443 are not available on the EC2 because another project owns them
+# (ex.: cloud-monitoring proxy), keep inventory-proxy on alternate host ports
+# via INVENTORY_PROXY_HTTP_PORT / INVENTORY_PROXY_HTTPS_PORT and route from the
+# existing reverse proxy to inventory-api:3333 or to the proxy high ports.

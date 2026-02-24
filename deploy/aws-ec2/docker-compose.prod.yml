@@ -1,0 +1,109 @@
+services:
+  inventory-postgres:
+    image: postgres:16-alpine
+    container_name: inventory-postgres
+    restart: unless-stopped
+    env_file:
+      - ./.env.prod
+    environment:
+      POSTGRES_DB: ${INVENTORY_POSTGRES_DB}
+      POSTGRES_USER: ${INVENTORY_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${INVENTORY_POSTGRES_PASSWORD}
+    volumes:
+      - inventory_pg_data:/var/lib/postgresql/data
+    networks:
+      - inventory_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${INVENTORY_POSTGRES_USER} -d ${INVENTORY_POSTGRES_DB}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    labels:
+      com.inventory.project: "controle-estoque"
+      com.inventory.service: "postgres"
+
+  inventory-api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    container_name: inventory-api
+    restart: unless-stopped
+    depends_on:
+      inventory-postgres:
+        condition: service_healthy
+    env_file:
+      - ./.env.prod
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3333
+      DATABASE_URL: ${INVENTORY_DATABASE_URL}
+      JWT_SECRET: ${INVENTORY_JWT_SECRET}
+      BCRYPT_SALT_ROUNDS: ${INVENTORY_BCRYPT_SALT_ROUNDS:-12}
+      CORS_ORIGINS: ${INVENTORY_CORS_ORIGINS}
+      TRUST_PROXY: ${INVENTORY_TRUST_PROXY:-true}
+      LOG_LEVEL: ${INVENTORY_LOG_LEVEL:-info}
+      ENABLE_SECURITY_HEADERS: ${INVENTORY_ENABLE_SECURITY_HEADERS:-true}
+      SEED_ADMIN_EMAIL: ${INVENTORY_SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${INVENTORY_SEED_ADMIN_PASSWORD:-}
+    ports:
+      - "${INVENTORY_API_PORT:-8087}:3333"
+    networks:
+      - inventory_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3333/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    labels:
+      com.inventory.project: "controle-estoque"
+      com.inventory.service: "api"
+
+  inventory-proxy:
+    image: caddy:2-alpine
+    container_name: inventory-proxy
+    restart: unless-stopped
+    profiles: ["proxy"]
+    depends_on:
+      inventory-api:
+        condition: service_healthy
+    env_file:
+      - ./.env.prod
+    ports:
+      - "${INVENTORY_PROXY_HTTP_PORT:-18080}:80"
+      - "${INVENTORY_PROXY_HTTPS_PORT:-18443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - inventory_caddy_data:/data
+      - inventory_caddy_config:/config
+    networks:
+      - inventory_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    labels:
+      com.inventory.project: "controle-estoque"
+      com.inventory.service: "proxy"
+
+networks:
+  inventory_net:
+    name: inventory_net
+
+volumes:
+  inventory_pg_data:
+    name: inventory_pg_data
+  inventory_caddy_data:
+    name: inventory_caddy_data
+  inventory_caddy_config:
+    name: inventory_caddy_config
