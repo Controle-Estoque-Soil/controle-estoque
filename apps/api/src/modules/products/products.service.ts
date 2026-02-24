@@ -10,6 +10,14 @@ function normalizeSku(sku?: string | null): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function resolveProductSkuForUpdate(sku?: string | null): string | undefined {
+  if (sku === undefined) {
+    return undefined;
+  }
+
+  return normalizeSku(sku) ?? generateAutoSku('PRD');
+}
+
 function generateAutoSku(prefix: 'PRD'): string {
   return `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 }
@@ -85,7 +93,7 @@ export class ProductsService {
 
     const product = await this.productsRepository.update(id, {
       name: input.name?.trim(),
-      sku: normalizeSku(input.sku),
+      sku: resolveProductSkuForUpdate(input.sku),
     });
 
     return serializeProduct(product);

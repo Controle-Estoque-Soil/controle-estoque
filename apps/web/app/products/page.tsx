@@ -412,7 +412,7 @@ export default function ProductsPage() {
                     <input
                       id="edit-product-sku"
                       className="input"
-                      placeholder="Mantem o SKU atual se vazio"
+                      placeholder="Gera novo SKU automaticamente se vazio"
                       value={editForm.sku}
                       onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })}
                     />
