@@ -22,15 +22,48 @@ jobs:
           AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
           AWS_EC2_SSH_KEY: ${{ secrets.AWS_EC2_SSH_KEY }}
           AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_PORT: ${{ secrets.AWS_EC2_PORT }}
         run: |
           set -euo pipefail
           test -n "${AWS_EC2_HOST}"
           test -n "${AWS_EC2_USER}"
           test -n "${AWS_EC2_SSH_KEY}"
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${AWS_EC2_SSH_KEY}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "${AWS_EC2_SSH_PORT:-22}" "${AWS_EC2_HOST}" >> ~/.ssh/known_hosts
+          RAW_KEY_PATH="${RUNNER_TEMP}/ec2_deploy_key.raw"
+          KEY_PATH="${HOME}/.ssh/id_ed25519"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-${AWS_EC2_PORT:-22}}"
+
+          if ! printf '%s' "${AWS_EC2_SSH_KEY}" | grep -Eq "PRIVATE KEY|PuTTY-User-Key-File-"; then
+            echo "::error::AWS_EC2_SSH_KEY invalida. Formatos aceitos: OpenSSH/PEM ou PPK (PuTTY)." >&2
+            exit 1
+          fi
+
+          # Aceita secret colado com quebras reais de linha ou com '\n' literal.
+          if printf '%s' "${AWS_EC2_SSH_KEY}" | grep -q '\\n'; then
+            printf '%b\n' "${AWS_EC2_SSH_KEY}" > "${RAW_KEY_PATH}"
+          else
+            printf '%s\n' "${AWS_EC2_SSH_KEY}" > "${RAW_KEY_PATH}"
+          fi
+
+          sed -i 's/\r$//' "${RAW_KEY_PATH}"
+
+          # Se vier em formato PPK, converte para OpenSSH no runner.
+          if grep -q '^PuTTY-User-Key-File-' "${RAW_KEY_PATH}"; then
+            sudo apt-get update -y
+            sudo apt-get install -y putty-tools
+            puttygen "${RAW_KEY_PATH}" -O private-openssh -o "${KEY_PATH}"
+          else
+            cp "${RAW_KEY_PATH}" "${KEY_PATH}"
+          fi
+
+          chmod 600 "${KEY_PATH}"
+
+          if ! ssh-keygen -yf "${KEY_PATH}" >/dev/null 2>&1; then
+            echo "::error::AWS_EC2_SSH_KEY invalida ou nao foi possivel converter para OpenSSH." >&2
+            exit 1
+          fi
+
+          ssh-keyscan -H -p "${SSH_PORT}" "${AWS_EC2_HOST}" >> ~/.ssh/known_hosts
 
       - name: Generate production env file (for EC2)
         env:
@@ -82,13 +115,14 @@ jobs:
           AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
           AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
           AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_PORT: ${{ secrets.AWS_EC2_PORT }}
           AWS_EC2_DEPLOY_PATH: ${{ secrets.AWS_EC2_DEPLOY_PATH }}
           REPOSITORY: ${{ github.repository }}
           DEPLOY_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           DEPLOY_PATH="${AWS_EC2_DEPLOY_PATH:-/opt/inventory-app}"
-          SSH_PORT="${AWS_EC2_SSH_PORT:-22}"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-${AWS_EC2_PORT:-22}}"
           ssh -p "${SSH_PORT}" "${AWS_EC2_USER}@${AWS_EC2_HOST}" "bash -lc '
             set -euo pipefail
             mkdir -p \"${DEPLOY_PATH}\"
@@ -110,11 +144,12 @@ jobs:
           AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
           AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
           AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_PORT: ${{ secrets.AWS_EC2_PORT }}
           AWS_EC2_DEPLOY_PATH: ${{ secrets.AWS_EC2_DEPLOY_PATH }}
         run: |
           set -euo pipefail
           DEPLOY_PATH="${AWS_EC2_DEPLOY_PATH:-/opt/inventory-app}"
-          SSH_PORT="${AWS_EC2_SSH_PORT:-22}"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-${AWS_EC2_PORT:-22}}"
           scp -P "${SSH_PORT}" .deploy-tmp/.env.prod "${AWS_EC2_USER}@${AWS_EC2_HOST}:${DEPLOY_PATH}/deploy/aws-ec2/.env.prod"
 
       - name: Build on EC2, migrate and restart inventory services
@@ -122,12 +157,13 @@ jobs:
           AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
           AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
           AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_PORT: ${{ secrets.AWS_EC2_PORT }}
           AWS_EC2_DEPLOY_PATH: ${{ secrets.AWS_EC2_DEPLOY_PATH }}
           PROD_ENABLE_PROXY_PROFILE: ${{ secrets.PROD_ENABLE_PROXY_PROFILE }}
         run: |
           set -euo pipefail
           DEPLOY_PATH="${AWS_EC2_DEPLOY_PATH:-/opt/inventory-app}"
-          SSH_PORT="${AWS_EC2_SSH_PORT:-22}"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-${AWS_EC2_PORT:-22}}"
           ENABLE_PROXY="${PROD_ENABLE_PROXY_PROFILE:-false}"
           ssh -p "${SSH_PORT}" "${AWS_EC2_USER}@${AWS_EC2_HOST}" "ENABLE_PROXY='${ENABLE_PROXY}' DEPLOY_PATH='${DEPLOY_PATH}' bash -lc '
             set -euo pipefail
@@ -147,11 +183,12 @@ jobs:
           AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
           AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
           AWS_EC2_SSH_PORT: ${{ secrets.AWS_EC2_SSH_PORT }}
+          AWS_EC2_PORT: ${{ secrets.AWS_EC2_PORT }}
           AWS_EC2_DEPLOY_PATH: ${{ secrets.AWS_EC2_DEPLOY_PATH }}
         run: |
           set -euo pipefail
           DEPLOY_PATH="${AWS_EC2_DEPLOY_PATH:-/opt/inventory-app}"
-          SSH_PORT="${AWS_EC2_SSH_PORT:-22}"
+          SSH_PORT="${AWS_EC2_SSH_PORT:-${AWS_EC2_PORT:-22}}"
           ssh -p "${SSH_PORT}" "${AWS_EC2_USER}@${AWS_EC2_HOST}" "DEPLOY_PATH='${DEPLOY_PATH}' bash -lc '
             set -euo pipefail
             cd \"${DEPLOY_PATH}\"
