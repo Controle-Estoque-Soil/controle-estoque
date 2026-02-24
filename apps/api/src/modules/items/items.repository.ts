@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma, type PrismaClient, type StockMovementReason, type StockMovementReferenceType } from '@prisma/client';
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -31,6 +32,26 @@ export interface MovementCreateRecordInput {
 
 export class ItemsRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private buildMovementReferenceCandidate(): string {
+    return `MOV-${createHash('sha256').update(randomUUID()).digest('hex').slice(0, 16).toUpperCase()}`;
+  }
+
+  private async generateUniqueMovementReferenceId(db: DbClient): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = this.buildMovementReferenceCandidate();
+      const existing = await db.stockMovement.findFirst({
+        where: { referenceId: candidate },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+    }
+
+    throw new Error('Failed to generate unique stock movement reference id');
+  }
 
   transaction<T>(callback: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     return this.prisma.$transaction((tx) => callback(tx));
@@ -99,14 +120,16 @@ export class ItemsRepository {
     });
   }
 
-  createMovement(data: MovementCreateRecordInput, db: DbClient = this.prisma) {
+  async createMovement(data: MovementCreateRecordInput, db: DbClient = this.prisma) {
+    const referenceId = data.referenceId ?? (await this.generateUniqueMovementReferenceId(db));
+
     return db.stockMovement.create({
       data: {
         itemId: data.itemId,
         deltaQty: data.deltaQty,
         reason: data.reason,
         referenceType: data.referenceType,
-        referenceId: data.referenceId ?? null,
+        referenceId,
         note: data.note ?? null,
         createdByUserId: data.createdByUserId,
       },
