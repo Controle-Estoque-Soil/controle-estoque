@@ -22,6 +22,26 @@ type MovementRecord = {
   createdByUser: { id: string; email: string; role: string };
 };
 
+type OrderDetailRecord = {
+  id: string;
+  type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
+  productQty: string;
+  totalCost: string;
+  unitCost: string;
+  note: string | null;
+  createdAt: string;
+  product: { id: string; name: string; sku: string; active: boolean };
+  createdByUser: { id: string; email: string; role: string };
+  lines: Array<{
+    id: string;
+    itemId: string;
+    itemQty: string;
+    itemUnitPriceSnapshot: string;
+    lineCost: string;
+    item: { id: string; name: string; sku: string; unit: string };
+  }>;
+};
+
 function toIsoOrUndefined(value: string): string | undefined {
   if (!value) {
     return undefined;
@@ -33,6 +53,10 @@ function toIsoOrUndefined(value: string): string | undefined {
   return date.toISOString();
 }
 
+function canOpenOrderDetail(movement: MovementRecord): boolean {
+  return movement.referenceType === 'PRODUCT_ORDER' && Boolean(movement.referenceId);
+}
+
 export default function MovementsPage() {
   const { token } = useAuth();
   const [items, setItems] = useState<ItemOption[]>([]);
@@ -40,6 +64,10 @@ export default function MovementsPage() {
   const [filters, setFilters] = useState({ itemId: '', reason: '', from: '', to: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OrderDetailRecord | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   async function loadItems() {
     if (!token) {
@@ -66,8 +94,14 @@ export default function MovementsPage() {
       const query = params.toString() ? `?${params.toString()}` : '';
       const response = await apiRequest<{ data: MovementRecord[] }>(`/movements${query}`, { token });
       setMovements(response.data);
+
+      if (selectedMovementId && !response.data.some((movement) => movement.id === selectedMovementId)) {
+        setSelectedMovementId(null);
+        setSelectedOrder(null);
+        setDetailError(null);
+      }
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar movimentações');
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar movimentacoes');
     } finally {
       setLoading(false);
     }
@@ -87,14 +121,36 @@ export default function MovementsPage() {
     await loadMovements();
   }
 
+  async function openMovementDetail(movement: MovementRecord) {
+    if (!token || !canOpenOrderDetail(movement) || !movement.referenceId) {
+      return;
+    }
+
+    setSelectedMovementId(movement.id);
+    setSelectedOrder(null);
+    setDetailError(null);
+    setDetailLoading(true);
+
+    try {
+      const response = await apiRequest<{ data: OrderDetailRecord }>(`/operations/${movement.referenceId}`, { token });
+      setSelectedOrder(response.data);
+    } catch (caughtError) {
+      setDetailError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar itens da operacao');
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   return (
     <RequireAuth>
       <AppShell>
         <section className="panel">
           <div className="page-header">
             <div>
-              <h1 className="page-title">Movimentações (auditoria)</h1>
-              <p className="page-subtitle">Filtre por item, motivo e período.</p>
+              <h1 className="page-title">Movimentacoes (auditoria)</h1>
+              <p className="page-subtitle">
+                Filtre por item, motivo e periodo. Clique em uma movimentacao de produto para ver os itens da ordem.
+              </p>
             </div>
           </div>
           <form className="grid" onSubmit={handleFilterSubmit}>
@@ -129,7 +185,7 @@ export default function MovementsPage() {
                 />
               </div>
               <div className="field">
-                <label>Até</label>
+                <label>Ate</label>
                 <input
                   type="datetime-local"
                   className="input"
@@ -147,6 +203,9 @@ export default function MovementsPage() {
                 className="button"
                 onClick={() => {
                   setFilters({ itemId: '', reason: '', from: '', to: '' });
+                  setSelectedMovementId(null);
+                  setSelectedOrder(null);
+                  setDetailError(null);
                   setTimeout(() => void loadMovements(), 0);
                 }}
               >
@@ -166,42 +225,117 @@ export default function MovementsPage() {
                   <th>Item</th>
                   <th>Delta</th>
                   <th>Motivo</th>
-                  <th>Referência</th>
-                  <th>Usuário</th>
+                  <th>Referencia</th>
+                  <th>Usuario</th>
                   <th>Nota</th>
+                  <th>Detalhe</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7}>Carregando...</td>
+                    <td colSpan={8}>Carregando...</td>
                   </tr>
                 ) : movements.length === 0 ? (
                   <tr>
-                    <td colSpan={7}>Nenhuma movimentação encontrada.</td>
+                    <td colSpan={8}>Nenhuma movimentacao encontrada.</td>
                   </tr>
                 ) : (
-                  movements.map((movement) => (
-                    <tr key={movement.id}>
-                      <td>{formatDateTime(movement.createdAt)}</td>
-                      <td>
-                        {movement.item.name}
-                        <div className="small">{movement.item.sku}</div>
-                      </td>
-                      <td>{formatDecimal(movement.deltaQty)} {movement.item.unit}</td>
-                      <td>{movement.reason}</td>
-                      <td>{movement.referenceType}{movement.referenceId ? ` / ${movement.referenceId}` : ''}</td>
-                      <td>{movement.createdByUser.email}</td>
-                      <td>{movement.note ?? '-'}</td>
-                    </tr>
-                  ))
+                  movements.map((movement) => {
+                    const isOrderMovement = canOpenOrderDetail(movement);
+                    return (
+                      <tr
+                        key={movement.id}
+                        className={selectedMovementId === movement.id ? 'table-row-selected' : undefined}
+                        onClick={isOrderMovement ? () => void openMovementDetail(movement) : undefined}
+                        style={isOrderMovement ? { cursor: 'pointer' } : undefined}
+                        title={isOrderMovement ? 'Clique para ver os itens da operacao' : undefined}
+                      >
+                        <td>{formatDateTime(movement.createdAt)}</td>
+                        <td>
+                          {movement.item.name}
+                          <div className="small">{movement.item.sku}</div>
+                        </td>
+                        <td>
+                          {formatDecimal(movement.deltaQty)} {movement.item.unit}
+                        </td>
+                        <td>{movement.reason}</td>
+                        <td>
+                          {movement.referenceType}
+                          {movement.referenceId ? ` / ${movement.referenceId}` : ''}
+                        </td>
+                        <td>{movement.createdByUser.email}</td>
+                        <td>{movement.note ?? '-'}</td>
+                        <td>
+                          {isOrderMovement ? (
+                            <button
+                              type="button"
+                              className="button ghost"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void openMovementDetail(movement);
+                              }}
+                            >
+                              Ver itens
+                            </button>
+                          ) : (
+                            <span className="small">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+
+          {(detailLoading || detailError || selectedOrder) ? (
+            <div className="grid" style={{ marginTop: '1rem' }}>
+              <div className="separator" />
+              <h3>Detalhe da movimentacao selecionada</h3>
+              {detailLoading ? <p className="small">Carregando itens da operacao...</p> : null}
+              {detailError ? <p className="inline-error">{detailError}</p> : null}
+              {selectedOrder ? (
+                <>
+                  <p className="small">
+                    {selectedOrder.type} | {selectedOrder.product.name} ({selectedOrder.product.sku}) | qtd{' '}
+                    {formatDecimal(selectedOrder.productQty)} | custo total {formatDecimal(selectedOrder.totalCost)} |{' '}
+                    {formatDateTime(selectedOrder.createdAt)}
+                  </p>
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th>Qtd</th>
+                          <th>Preco snapshot</th>
+                          <th>Custo linha</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedOrder.lines.map((line) => (
+                          <tr key={line.id}>
+                            <td>
+                              {line.item.name}
+                              <div className="small">{line.item.sku}</div>
+                            </td>
+                            <td>
+                              {formatDecimal(line.itemQty)} {line.item.unit}
+                            </td>
+                            <td>{formatDecimal(line.itemUnitPriceSnapshot)}</td>
+                            <td>{formatDecimal(line.lineCost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </section>
       </AppShell>
     </RequireAuth>
   );
 }
-

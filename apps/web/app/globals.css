@@ -250,6 +250,12 @@ a {
   border-color: var(--line);
 }
 
+.button.ghost.active-pill {
+  background: rgba(21, 128, 61, 0.08);
+  border-color: rgba(21, 128, 61, 0.24);
+  color: var(--accent-2);
+}
+
 .button.danger {
   background: linear-gradient(135deg, var(--danger), #ef4444);
 }
@@ -292,6 +298,18 @@ a {
   border-bottom: none;
 }
 
+.table tbody tr.table-row-selected {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.table tbody tr.table-row-warn {
+  background: rgba(34, 197, 94, 0.07);
+}
+
+.table tbody tr.table-row-danger {
+  background: rgba(239, 68, 68, 0.08);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -326,6 +344,47 @@ a {
 .inline-success {
   color: #166534;
   font-size: 0.85rem;
+}
+
+.alert-block {
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 0.9rem;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.alert-block h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.alert-block p {
+  margin: 0;
+}
+
+.alert-block ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1rem;
+}
+
+.alert-block.warn {
+  border-color: rgba(22, 101, 52, 0.3);
+  background: rgba(240, 253, 244, 0.95);
+}
+
+.alert-block.warn strong,
+.alert-block.warn h3 {
+  color: #166534;
+}
+
+.alert-block.danger {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(254, 242, 242, 0.95);
+}
+
+.alert-block.danger strong,
+.alert-block.danger h3 {
+  color: #b91c1c;
 }
 
 .page-title {

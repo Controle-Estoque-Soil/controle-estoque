@@ -25,6 +25,15 @@ export const operationFormSchema = z.object({
   allowNegativeOverride: z.boolean().default(false),
 });
 
+export const itemOperationFormSchema = z.object({
+  itemId: z.string().min(1, 'Selecione um item'),
+  qty: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invÃ¡lida').refine((value) => Number(value) > 0, {
+    message: 'Quantidade deve ser maior que zero',
+  }),
+  note: z.string().optional(),
+  allowNegativeOverride: z.boolean().default(false),
+});
+
 export const bomLineSchema = z.object({
   itemId: z.string().min(1, 'Selecione um item'),
   qtyRequired: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade inválida').refine((value) => Number(value) > 0, {
