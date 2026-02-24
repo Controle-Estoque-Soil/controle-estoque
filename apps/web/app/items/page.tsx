@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
+import { DeleteActionDialog } from '@/components/delete-action-dialog';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal } from '@/lib/format';
 import { itemFormSchema } from '@/lib/schemas';
@@ -48,20 +49,6 @@ function emptyItemForm() {
   };
 }
 
-function promptPositiveQuantity(message: string): string | null {
-  const rawValue = window.prompt(message);
-  if (rawValue === null) {
-    return null;
-  }
-
-  const value = rawValue.trim().replace(',', '.');
-  if (!/^\d+(\.\d+)?$/.test(value) || /^0(?:\.0+)?$/.test(value)) {
-    throw new Error('Informe uma quantidade decimal maior que zero.');
-  }
-
-  return value;
-}
-
 export default function ItemsPage() {
   const { token, user } = useAuth();
   const [items, setItems] = useState<ItemRecord[]>([]);
@@ -75,6 +62,7 @@ export default function ItemsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ item: ItemRecord; qty: string } | null>(null);
 
   const selectedItem = useMemo(() => items.find((item) => item.id === selectedItemId) ?? null, [items, selectedItemId]);
 
@@ -192,11 +180,8 @@ export default function ItemsPage() {
     }
   }
 
-  async function handleDeactivate(id: string) {
+  async function deactivateItem(id: string) {
     if (!token) {
-      return;
-    }
-    if (!window.confirm('Deletar tudo do cadastro deste item? (A ação desativa o item)')) {
       return;
     }
 
@@ -215,7 +200,7 @@ export default function ItemsPage() {
     }
   }
 
-  async function handleRemoveQuantity(item: ItemRecord) {
+  async function removeItemQuantity(item: ItemRecord, qty: string) {
     if (!token) {
       return;
     }
@@ -229,15 +214,6 @@ export default function ItemsPage() {
     setSuccess(null);
 
     try {
-      const qty = promptPositiveQuantity(`Remover quantos ${item.unit} de "${item.name}"?`);
-      if (!qty) {
-        return;
-      }
-
-      if (!window.confirm(`Confirmar remoção de ${qty} ${item.unit} do item "${item.name}"?`)) {
-        return;
-      }
-
       await apiRequest<{ data: ItemRecord }>(`/items/${item.id}/adjust-stock`, {
         method: 'POST',
         token,
@@ -254,7 +230,54 @@ export default function ItemsPage() {
         await loadDetail(item.id);
       }
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : (caughtError as Error).message || 'Falha ao remover quantidade');
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao remover quantidade');
+    }
+  }
+
+  function openDeleteDialog(item: ItemRecord) {
+    setDeleteDialog({ item, qty: '1' });
+    setError(null);
+    setSuccess(null);
+  }
+
+  function closeDeleteDialog() {
+    if (saving) {
+      return;
+    }
+    setDeleteDialog(null);
+  }
+
+  async function handleDeleteDialogQuantity() {
+    if (!deleteDialog) {
+      return;
+    }
+
+    const qty = deleteDialog.qty.trim();
+    if (!/^\d+(\.\d+)?$/.test(qty) || /^0(?:\.0+)?$/.test(qty)) {
+      setError('Informe uma quantidade decimal maior que zero.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await removeItemQuantity(deleteDialog.item, qty);
+      setDeleteDialog(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteDialogAll() {
+    if (!deleteDialog) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await deactivateItem(deleteDialog.item.id);
+      setDeleteDialog(null);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -351,13 +374,8 @@ export default function ItemsPage() {
                             <button type="button" className="button ghost" onClick={() => void loadDetail(item.id)}>
                               Detalhe
                             </button>
-                            {user?.role === 'ADMIN' ? (
-                              <button type="button" className="button secondary" onClick={() => void handleRemoveQuantity(item)}>
-                                Remover qtd
-                              </button>
-                            ) : null}
-                            <button type="button" className="button danger" onClick={() => void handleDeactivate(item.id)}>
-                              Deletar tudo
+                            <button type="button" className="button danger" onClick={() => openDeleteDialog(item)}>
+                              Deletar
                             </button>
                           </div>
                         </td>
@@ -539,6 +557,26 @@ export default function ItemsPage() {
             )}
           </div>
         </section>
+
+        <DeleteActionDialog
+          open={deleteDialog != null}
+          busy={saving}
+          title="Deletar item"
+          entityName={deleteDialog ? `${deleteDialog.item.name} (${deleteDialog.item.sku})` : ''}
+          quantityLabel="Quantidade para remover"
+          quantityUnit={deleteDialog?.item.unit}
+          quantityValue={deleteDialog?.qty ?? ''}
+          totalValueLabel="Estoque atual"
+          totalValue={deleteDialog ? formatDecimal(deleteDialog.item.qtyOnHand) : null}
+          totalValueUnit={deleteDialog?.item.unit}
+          allModeDescription="Deletar tudo desativa o cadastro do item. O histórico de auditoria é preservado."
+          onClose={closeDeleteDialog}
+          onQuantityChange={(value) =>
+            setDeleteDialog((current) => (current ? { ...current, qty: value } : current))
+          }
+          onConfirmQuantity={handleDeleteDialogQuantity}
+          onConfirmDeleteAll={handleDeleteDialogAll}
+        />
       </AppShell>
     </RequireAuth>
   );

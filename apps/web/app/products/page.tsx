@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
+import { DeleteActionDialog } from '@/components/delete-action-dialog';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDecimal } from '@/lib/format';
 import { bomLineSchema, productFormSchema } from '@/lib/schemas';
@@ -41,20 +42,6 @@ function emptyProductForm() {
   };
 }
 
-function promptPositiveQuantity(message: string): string | null {
-  const rawValue = window.prompt(message);
-  if (rawValue === null) {
-    return null;
-  }
-
-  const value = rawValue.trim().replace(',', '.');
-  if (!/^\d+(\.\d+)?$/.test(value) || /^0(?:\.0+)?$/.test(value)) {
-    throw new Error('Informe uma quantidade decimal maior que zero.');
-  }
-
-  return value;
-}
-
 export default function ProductsPage() {
   const { token } = useAuth();
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -69,6 +56,7 @@ export default function ProductsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ product: ProductRecord; qty: string } | null>(null);
 
   const activeItemOptions = useMemo(() => items.filter((item) => item.active), [items]);
 
@@ -182,11 +170,8 @@ export default function ProductsPage() {
     }
   }
 
-  async function handleDeactivate(id: string) {
+  async function deactivateProduct(id: string) {
     if (!token) {
-      return;
-    }
-    if (!window.confirm('Deletar tudo do cadastro deste produto? (A ação desativa o produto)')) {
       return;
     }
 
@@ -206,7 +191,7 @@ export default function ProductsPage() {
     }
   }
 
-  async function handleRemoveQuantity(product: ProductRecord) {
+  async function removeProductQuantity(product: ProductRecord, qty: string) {
     if (!token) {
       return;
     }
@@ -215,15 +200,6 @@ export default function ProductsPage() {
     setSuccess(null);
 
     try {
-      const qty = promptPositiveQuantity(`Remover quantas unidades do produto "${product.name}"?`);
-      if (!qty) {
-        return;
-      }
-
-      if (!window.confirm(`Confirmar saída de ${qty} unidade(s) do produto "${product.name}"?`)) {
-        return;
-      }
-
       await apiRequest('/operations/outbound', {
         method: 'POST',
         token,
@@ -240,7 +216,54 @@ export default function ProductsPage() {
         await loadDetail(product.id);
       }
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : (caughtError as Error).message || 'Falha ao remover quantidade');
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao remover quantidade');
+    }
+  }
+
+  function openDeleteDialog(product: ProductRecord) {
+    setDeleteDialog({ product, qty: '1' });
+    setError(null);
+    setSuccess(null);
+  }
+
+  function closeDeleteDialog() {
+    if (saving) {
+      return;
+    }
+    setDeleteDialog(null);
+  }
+
+  async function handleDeleteDialogQuantity() {
+    if (!deleteDialog) {
+      return;
+    }
+
+    const qty = deleteDialog.qty.trim();
+    if (!/^\d+(\.\d+)?$/.test(qty) || /^0(?:\.0+)?$/.test(qty)) {
+      setError('Informe uma quantidade decimal maior que zero.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await removeProductQuantity(deleteDialog.product, qty);
+      setDeleteDialog(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteDialogAll() {
+    if (!deleteDialog) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await deactivateProduct(deleteDialog.product.id);
+      setDeleteDialog(null);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -333,11 +356,8 @@ export default function ProductsPage() {
                           <button type="button" className="button ghost" onClick={() => void loadDetail(product.id)}>
                             Editar / BOM
                           </button>
-                          <button type="button" className="button secondary" onClick={() => void handleRemoveQuantity(product)}>
-                            Remover qtd
-                          </button>
-                          <button type="button" className="button danger" onClick={() => void handleDeactivate(product.id)}>
-                            Deletar tudo
+                          <button type="button" className="button danger" onClick={() => openDeleteDialog(product)}>
+                            Deletar
                           </button>
                         </div>
                       </td>
@@ -526,6 +546,26 @@ export default function ProductsPage() {
             )}
           </div>
         </section>
+
+        <DeleteActionDialog
+          open={deleteDialog != null}
+          busy={saving}
+          title="Deletar produto"
+          entityName={deleteDialog ? `${deleteDialog.product.name} (${deleteDialog.product.sku})` : ''}
+          quantityLabel="Quantidade de produtos para remover"
+          quantityUnit="un"
+          quantityValue={deleteDialog?.qty ?? ''}
+          totalValueLabel="Itens na BOM"
+          totalValue={deleteDialog ? String(deleteDialog.product.bomItemsCount ?? 0) : null}
+          totalValueUnit="itens"
+          allModeDescription="Deletar tudo desativa o cadastro do produto. O sistema não mantém estoque próprio de produto final."
+          onClose={closeDeleteDialog}
+          onQuantityChange={(value) =>
+            setDeleteDialog((current) => (current ? { ...current, qty: value } : current))
+          }
+          onConfirmQuantity={handleDeleteDialogQuantity}
+          onConfirmDeleteAll={handleDeleteDialogAll}
+        />
       </AppShell>
     </RequireAuth>
   );
