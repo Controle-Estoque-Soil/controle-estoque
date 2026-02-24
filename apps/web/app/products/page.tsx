@@ -41,6 +41,20 @@ function emptyProductForm() {
   };
 }
 
+function promptPositiveQuantity(message: string): string | null {
+  const rawValue = window.prompt(message);
+  if (rawValue === null) {
+    return null;
+  }
+
+  const value = rawValue.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(value) || /^0(?:\.0+)?$/.test(value)) {
+    throw new Error('Informe uma quantidade decimal maior que zero.');
+  }
+
+  return value;
+}
+
 export default function ProductsPage() {
   const { token } = useAuth();
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -172,7 +186,7 @@ export default function ProductsPage() {
     if (!token) {
       return;
     }
-    if (!window.confirm('Desativar este produto?')) {
+    if (!window.confirm('Deletar tudo do cadastro deste produto? (A ação desativa o produto)')) {
       return;
     }
 
@@ -189,6 +203,44 @@ export default function ProductsPage() {
       await loadProducts();
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao desativar produto');
+    }
+  }
+
+  async function handleRemoveQuantity(product: ProductRecord) {
+    if (!token) {
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const qty = promptPositiveQuantity(`Remover quantas unidades do produto "${product.name}"?`);
+      if (!qty) {
+        return;
+      }
+
+      if (!window.confirm(`Confirmar saída de ${qty} unidade(s) do produto "${product.name}"?`)) {
+        return;
+      }
+
+      await apiRequest('/operations/outbound', {
+        method: 'POST',
+        token,
+        body: {
+          productId: product.id,
+          qty,
+          note: 'Remoção rápida pela lista de produtos',
+        },
+      });
+
+      setSuccess(`Saída registrada para o produto "${product.name}".`);
+      await loadProducts();
+      if (selectedProductId === product.id) {
+        await loadDetail(product.id);
+      }
+    } catch (caughtError) {
+      setError(caughtError instanceof ApiError ? caughtError.message : (caughtError as Error).message || 'Falha ao remover quantidade');
     }
   }
 
@@ -281,8 +333,11 @@ export default function ProductsPage() {
                           <button type="button" className="button ghost" onClick={() => void loadDetail(product.id)}>
                             Editar / BOM
                           </button>
+                          <button type="button" className="button secondary" onClick={() => void handleRemoveQuantity(product)}>
+                            Remover qtd
+                          </button>
                           <button type="button" className="button danger" onClick={() => void handleDeactivate(product.id)}>
-                            Desativar
+                            Deletar tudo
                           </button>
                         </div>
                       </td>

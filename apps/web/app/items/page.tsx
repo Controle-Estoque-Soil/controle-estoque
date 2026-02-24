@@ -48,6 +48,20 @@ function emptyItemForm() {
   };
 }
 
+function promptPositiveQuantity(message: string): string | null {
+  const rawValue = window.prompt(message);
+  if (rawValue === null) {
+    return null;
+  }
+
+  const value = rawValue.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(value) || /^0(?:\.0+)?$/.test(value)) {
+    throw new Error('Informe uma quantidade decimal maior que zero.');
+  }
+
+  return value;
+}
+
 export default function ItemsPage() {
   const { token, user } = useAuth();
   const [items, setItems] = useState<ItemRecord[]>([]);
@@ -182,7 +196,7 @@ export default function ItemsPage() {
     if (!token) {
       return;
     }
-    if (!window.confirm('Desativar este item?')) {
+    if (!window.confirm('Deletar tudo do cadastro deste item? (A ação desativa o item)')) {
       return;
     }
 
@@ -198,6 +212,49 @@ export default function ItemsPage() {
       await loadItems();
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao desativar item');
+    }
+  }
+
+  async function handleRemoveQuantity(item: ItemRecord) {
+    if (!token) {
+      return;
+    }
+
+    if (user?.role !== 'ADMIN') {
+      setError('Apenas ADMIN pode remover quantidade diretamente de um item.');
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const qty = promptPositiveQuantity(`Remover quantos ${item.unit} de "${item.name}"?`);
+      if (!qty) {
+        return;
+      }
+
+      if (!window.confirm(`Confirmar remoção de ${qty} ${item.unit} do item "${item.name}"?`)) {
+        return;
+      }
+
+      await apiRequest<{ data: ItemRecord }>(`/items/${item.id}/adjust-stock`, {
+        method: 'POST',
+        token,
+        body: {
+          deltaQty: `-${qty}`,
+          note: 'Remoção rápida pela lista de itens',
+          allowNegativeOverride: false,
+        },
+      });
+
+      setSuccess(`Quantidade removida do item "${item.name}".`);
+      await loadItems();
+      if (selectedItemId === item.id) {
+        await loadDetail(item.id);
+      }
+    } catch (caughtError) {
+      setError(caughtError instanceof ApiError ? caughtError.message : (caughtError as Error).message || 'Falha ao remover quantidade');
     }
   }
 
@@ -294,8 +351,13 @@ export default function ItemsPage() {
                             <button type="button" className="button ghost" onClick={() => void loadDetail(item.id)}>
                               Detalhe
                             </button>
+                            {user?.role === 'ADMIN' ? (
+                              <button type="button" className="button secondary" onClick={() => void handleRemoveQuantity(item)}>
+                                Remover qtd
+                              </button>
+                            ) : null}
                             <button type="button" className="button danger" onClick={() => void handleDeactivate(item.id)}>
-                              Desativar
+                              Deletar tudo
                             </button>
                           </div>
                         </td>
