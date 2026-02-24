@@ -347,10 +347,7 @@ export default function MovementsPage() {
                           )}
                         </td>
                         <td>{formatMovementReason(movement.reason, movement.deltaQty)}</td>
-                        <td>
-                          {movement.referenceType}
-                          {movement.referenceId ? ` / ${movement.referenceId}` : ''}
-                        </td>
+                        <td>{movement.referenceId ?? movement.id}</td>
                         <td>{movement.createdByUser.email}</td>
                         <td>
                           {movement.note ?? '-'}
