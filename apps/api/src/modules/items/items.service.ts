@@ -39,6 +39,14 @@ function normalizeSku(sku?: string | null): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function resolveItemSkuForUpdate(sku?: string | null): string | undefined {
+  if (sku === undefined) {
+    return undefined;
+  }
+
+  return normalizeSku(sku) ?? generateAutoSku('ITM');
+}
+
 function generateAutoSku(prefix: 'ITM'): string {
   return `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 }
@@ -183,7 +191,7 @@ export class ItemsService {
 
     const updated = await this.itemsRepository.update(id, {
       name: input.name?.trim(),
-      sku: normalizeSku(input.sku),
+      sku: resolveItemSkuForUpdate(input.sku),
       unit: input.unit?.trim(),
       unitPrice: input.unitPrice ? toDecimal(input.unitPrice) : undefined,
       minQty:
