@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { appErrors } from '../../core/app-error';
 import { decimalToString, toDecimal } from '../../utils/decimal';
 import type { ProductBomReplaceBody, ProductCreateBody, ProductListQuery, ProductUpdateBody } from './products.schemas';
@@ -17,7 +18,6 @@ function serializeProduct(product: {
   id: string;
   name: string;
   sku: string;
-  active: boolean;
   createdAt: Date;
   updatedAt: Date;
   _count?: { bomItems: number };
@@ -26,7 +26,6 @@ function serializeProduct(product: {
     id: product.id,
     name: product.name,
     sku: product.sku,
-    active: product.active,
     bomItemsCount: product._count?.bomItems,
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
@@ -39,7 +38,6 @@ export class ProductsService {
   async list(query: ProductListQuery) {
     const products = await this.productsRepository.list({
       search: query.search?.trim() || undefined,
-      active: query.active,
     });
 
     return products.map(serializeProduct);
@@ -65,7 +63,6 @@ export class ProductsService {
           unitPrice: decimalToString(bomItem.item.unitPrice) ?? '0',
           qtyOnHand: decimalToString(bomItem.item.qtyOnHand) ?? '0',
           minQty: decimalToString(bomItem.item.minQty),
-          active: bomItem.item.active,
         },
       })),
     };
@@ -75,7 +72,6 @@ export class ProductsService {
     const product = await this.productsRepository.create({
       name: input.name.trim(),
       sku: normalizeSku(input.sku) ?? generateAutoSku('PRD'),
-      active: input.active ?? true,
     });
 
     return serializeProduct(product);
@@ -90,7 +86,6 @@ export class ProductsService {
     const product = await this.productsRepository.update(id, {
       name: input.name?.trim(),
       sku: normalizeSku(input.sku),
-      active: input.active,
     });
 
     return serializeProduct(product);
@@ -102,8 +97,15 @@ export class ProductsService {
       throw appErrors.notFound('Product not found');
     }
 
-    const product = await this.productsRepository.softDelete(id);
-    return serializeProduct(product);
+    try {
+      const product = await this.productsRepository.delete(id);
+      return serializeProduct(product);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw appErrors.conflict('Produto nao pode ser removido porque possui ordens/movimentacoes vinculadas');
+      }
+      throw error;
+    }
   }
 
   async replaceBom(productId: string, input: ProductBomReplaceBody) {

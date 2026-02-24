@@ -14,13 +14,12 @@ type ProductRecord = {
   id: string;
   name: string;
   sku: string;
-  active: boolean;
   bomItemsCount?: number;
   createdAt: string;
   updatedAt: string;
 };
 
-type ItemOption = { id: string; name: string; sku: string; unit: string; active: boolean };
+type ItemOption = { id: string; name: string; sku: string; unit: string };
 
 type ProductDetailResponse = {
   data: ProductRecord;
@@ -28,7 +27,7 @@ type ProductDetailResponse = {
     id: string;
     itemId: string;
     qtyRequired: string;
-    item: { id: string; name: string; sku: string; unit: string; unitPrice: string; qtyOnHand: string; active: boolean };
+    item: { id: string; name: string; sku: string; unit: string; unitPrice: string; qtyOnHand: string };
   }>;
 };
 
@@ -38,7 +37,6 @@ function emptyProductForm() {
   return {
     name: '',
     sku: '',
-    active: true,
   };
 }
 
@@ -58,7 +56,7 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ product: ProductRecord; qty: string } | null>(null);
 
-  const activeItemOptions = useMemo(() => items.filter((item) => item.active), [items]);
+  const bomItemOptions = useMemo(() => items, [items]);
 
   async function loadProducts() {
     if (!token) {
@@ -101,7 +99,6 @@ export default function ProductsPage() {
       setEditForm({
         name: response.data.name,
         sku: response.data.sku,
-        active: response.data.active,
       });
       setBomLines(response.bom.map((line) => ({ itemId: line.itemId, qtyRequired: line.qtyRequired })));
     } catch (caughtError) {
@@ -170,7 +167,7 @@ export default function ProductsPage() {
     }
   }
 
-  async function deactivateProduct(id: string) {
+  async function deleteProduct(id: string) {
     if (!token) {
       return;
     }
@@ -179,7 +176,7 @@ export default function ProductsPage() {
     setSuccess(null);
     try {
       await apiRequest<{ data: ProductRecord }>(`/products/${id}`, { method: 'DELETE', token });
-      setSuccess('Produto desativado.');
+      setSuccess('Produto removido.');
       if (selectedProductId === id) {
         setSelectedProductId(null);
         setDetail(null);
@@ -187,7 +184,7 @@ export default function ProductsPage() {
       }
       await loadProducts();
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao desativar produto');
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao remover produto');
     }
   }
 
@@ -260,7 +257,7 @@ export default function ProductsPage() {
 
     setSaving(true);
     try {
-      await deactivateProduct(deleteDialog.product.id);
+      await deleteProduct(deleteDialog.product.id);
       setDeleteDialog(null);
     } finally {
       setSaving(false);
@@ -331,14 +328,13 @@ export default function ProductsPage() {
                   <th>Produto</th>
                   <th>SKU</th>
                   <th>BOM</th>
-                  <th>Status</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={5}>Nenhum produto cadastrado.</td>
+                    <td colSpan={4}>Nenhum produto cadastrado.</td>
                   </tr>
                 ) : (
                   products.map((product) => (
@@ -346,11 +342,6 @@ export default function ProductsPage() {
                       <td>{product.name}</td>
                       <td>{product.sku}</td>
                       <td>{product.bomItemsCount ?? 0} itens</td>
-                      <td>
-                        <span className={`badge ${product.active ? 'ok' : 'danger'}`}>
-                          {product.active ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </td>
                       <td>
                         <div className="actions">
                           <button type="button" className="button ghost" onClick={() => void loadDetail(product.id)}>
@@ -392,15 +383,6 @@ export default function ProductsPage() {
                   onChange={(e) => setCreateForm({ ...createForm, sku: e.target.value })}
                 />
               </div>
-              <div className="field full checkbox-row">
-                <input
-                  id="create-product-active"
-                  type="checkbox"
-                  checked={createForm.active}
-                  onChange={(e) => setCreateForm({ ...createForm, active: e.target.checked })}
-                />
-                <label htmlFor="create-product-active">Ativo</label>
-              </div>
               <div className="actions full">
                 <button type="submit" className="button" disabled={saving}>
                   {saving ? 'Salvando...' : 'Criar produto'}
@@ -435,15 +417,6 @@ export default function ProductsPage() {
                       onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })}
                     />
                   </div>
-                  <div className="field full checkbox-row">
-                    <input
-                      id="edit-product-active"
-                      type="checkbox"
-                      checked={editForm.active}
-                      onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
-                    />
-                    <label htmlFor="edit-product-active">Ativo</label>
-                  </div>
                   <div className="actions full">
                     <button type="submit" className="button secondary" disabled={saving}>
                       Salvar produto
@@ -475,7 +448,7 @@ export default function ProductsPage() {
                           }
                         >
                           <option value="">Selecione...</option>
-                          {activeItemOptions.map((item) => (
+                          {bomItemOptions.map((item) => (
                             <option key={item.id} value={item.id}>
                               {item.name} ({item.sku}) - {item.unit}
                             </option>
@@ -560,7 +533,7 @@ export default function ProductsPage() {
           totalValueLabel="Itens na BOM"
           totalValue={deleteDialog ? String(deleteDialog.product.bomItemsCount ?? 0) : null}
           totalValueUnit="itens"
-          allModeDescription="Deletar tudo desativa o cadastro do produto. O sistema não mantém estoque próprio de produto final."
+          allModeDescription="Deletar tudo tenta excluir o cadastro do produto. Se houver ordens/movimentacoes vinculadas, o sistema bloqueará a exclusão."
           onClose={closeDeleteDialog}
           onQuantityChange={(value) =>
             setDeleteDialog((current) => (current ? { ...current, qty: value } : current))

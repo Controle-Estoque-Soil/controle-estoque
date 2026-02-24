@@ -18,7 +18,6 @@ type ItemRecord = {
   unitPrice: string;
   qtyOnHand: string;
   minQty: string | null;
-  active: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -45,7 +44,6 @@ function emptyItemForm() {
     unitPrice: '0',
     qtyOnHand: '0',
     minQty: '',
-    active: true,
   };
 }
 
@@ -99,7 +97,6 @@ export default function ItemsPage() {
         unitPrice: response.item.unitPrice,
         qtyOnHand: response.item.qtyOnHand,
         minQty: response.item.minQty ?? '',
-        active: response.item.active,
       });
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar detalhe do item');
@@ -162,7 +159,6 @@ export default function ItemsPage() {
           unit: parsed.unit,
           unitPrice: parsed.unitPrice,
           minQty: parsed.minQty,
-          active: parsed.active,
         },
       });
       setSuccess('Item atualizado com sucesso.');
@@ -179,7 +175,7 @@ export default function ItemsPage() {
     }
   }
 
-  async function deactivateItem(id: string) {
+  async function deleteItem(id: string) {
     if (!token) {
       return;
     }
@@ -188,14 +184,14 @@ export default function ItemsPage() {
     setSuccess(null);
     try {
       await apiRequest<{ data: ItemRecord }>(`/items/${id}`, { method: 'DELETE', token });
-      setSuccess('Item desativado.');
+      setSuccess('Item removido.');
       if (selectedItemId === id) {
         setDetail(null);
         setSelectedItemId(null);
       }
       await loadItems();
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao desativar item');
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao remover item');
     }
   }
 
@@ -273,7 +269,7 @@ export default function ItemsPage() {
 
     setSaving(true);
     try {
-      await deactivateItem(deleteDialog.item.id);
+      await deleteItem(deleteDialog.item.id);
       setDeleteDialog(null);
     } finally {
       setSaving(false);
@@ -342,14 +338,13 @@ export default function ItemsPage() {
                   <th>Preço</th>
                   <th>Estoque</th>
                   <th>Mínimo</th>
-                  <th>Status</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>Nenhum item cadastrado.</td>
+                    <td colSpan={7}>Nenhum item cadastrado.</td>
                   </tr>
                 ) : (
                   items.map((item) => {
@@ -363,9 +358,6 @@ export default function ItemsPage() {
                         <td>{formatDecimal(item.qtyOnHand)}</td>
                         <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
                         <td>
-                          <span className={`badge ${item.active ? 'ok' : 'danger'}`}>
-                            {item.active ? 'Ativo' : 'Inativo'}
-                          </span>
                           {belowMin ? <span className="badge warn">Abaixo mín.</span> : null}
                         </td>
                         <td>
@@ -420,15 +412,6 @@ export default function ItemsPage() {
                 <label>Estoque minimo</label>
                 <input className="input" value={createForm.minQty} onChange={(e) => setCreateForm({ ...createForm, minQty: e.target.value })} />
               </div>
-              <div className="field full checkbox-row">
-                <input
-                  id="create-item-active"
-                  type="checkbox"
-                  checked={createForm.active}
-                  onChange={(e) => setCreateForm({ ...createForm, active: e.target.checked })}
-                />
-                <label htmlFor="create-item-active">Ativo</label>
-              </div>
               <div className="actions full">
                 <button className="button" type="submit" disabled={saving}>
                   {saving ? 'Salvando...' : 'Criar item'}
@@ -472,15 +455,6 @@ export default function ItemsPage() {
                   <div className="field">
                     <label>Estoque minimo</label>
                     <input className="input" value={editForm.minQty} onChange={(e) => setEditForm({ ...editForm, minQty: e.target.value })} />
-                  </div>
-                  <div className="field full checkbox-row">
-                    <input
-                      id="edit-item-active"
-                      type="checkbox"
-                      checked={editForm.active}
-                      onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
-                    />
-                    <label htmlFor="edit-item-active">Ativo</label>
                   </div>
                   <div className="actions full">
                     <button className="button secondary" type="submit" disabled={saving}>
@@ -578,7 +552,7 @@ export default function ItemsPage() {
           totalValueLabel="Estoque atual"
           totalValue={deleteDialog ? formatDecimal(deleteDialog.item.qtyOnHand) : null}
           totalValueUnit={deleteDialog?.item.unit}
-          allModeDescription="Deletar tudo desativa o cadastro do item. O histórico de auditoria é preservado."
+          allModeDescription="Deletar tudo tenta excluir o cadastro do item. Se houver auditoria, BOM ou ordens vinculadas, o sistema bloqueará a exclusão."
           onClose={closeDeleteDialog}
           onQuantityChange={(value) =>
             setDeleteDialog((current) => (current ? { ...current, qty: value } : current))

@@ -50,7 +50,6 @@ function serializeOrderDetail(order: OrderDetailRecord) {
       id: order.product.id,
       name: order.product.name,
       sku: order.product.sku,
-      active: order.product.active,
     },
     createdByUser: {
       id: order.createdByUser.id,
@@ -102,10 +101,6 @@ export class OperationsService {
 
     if (!product) {
       throw appErrors.notFound('Product not found');
-    }
-
-    if (!product.active) {
-      throw appErrors.badRequest('Inactive product cannot be used in operations');
     }
 
     if (product.bomItems.length === 0) {

@@ -9,7 +9,7 @@ import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal } from '@/lib/format';
 import { itemOperationFormSchema, operationFormSchema } from '@/lib/schemas';
 
-type ProductOption = { id: string; name: string; sku: string; active: boolean };
+type ProductOption = { id: string; name: string; sku: string };
 type ItemOption = {
   id: string;
   name: string;
@@ -18,7 +18,6 @@ type ItemOption = {
   unitPrice: string;
   qtyOnHand: string;
   minQty: string | null;
-  active: boolean;
 };
 
 type ProductOperationPreviewResponse = {
@@ -91,7 +90,7 @@ type OrderDetailRecord = {
   unitCost: string;
   note: string | null;
   createdAt: string;
-  product: { id: string; name: string; sku: string; active: boolean };
+  product: { id: string; name: string; sku: string };
   createdByUser: { id: string; email: string; role: string };
   lines: Array<{
     id: string;
@@ -185,7 +184,7 @@ export default function OperationsPage() {
       return;
     }
     const response = await apiRequest<{ data: ProductOption[] }>('/products', { token });
-    setProducts(response.data.filter((product) => product.active));
+    setProducts(response.data);
   }
 
   async function loadItems() {
@@ -261,10 +260,6 @@ export default function OperationsPage() {
     if (!item) {
       throw new ApiError('Item nao encontrado na lista atual', 400);
     }
-    if (!item.active) {
-      throw new ApiError('Item inativo nao pode ser usado nesta operacao', 400);
-    }
-
     const qty = Number(payload.qty);
     const currentQty = Number(item.qtyOnHand);
     const signedDelta = mode === 'outbound' ? -qty : qty;
@@ -504,13 +499,11 @@ export default function OperationsPage() {
                       onChange={(e) => setItemForm({ ...itemForm, itemId: e.target.value })}
                     >
                       <option value="">Selecione...</option>
-                      {items
-                        .filter((item) => item.active)
-                        .map((item) => (
+                      {items.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.name} ({item.sku}) - estoque {formatDecimal(item.qtyOnHand)} {item.unit}
                           </option>
-                        ))}
+                      ))}
                     </select>
                   </div>
                   <div className="field">

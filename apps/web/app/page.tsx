@@ -14,7 +14,6 @@ type ItemRecord = {
   unit: string;
   qtyOnHand: string;
   minQty: string | null;
-  active: boolean;
 };
 
 type MovementRecord = {

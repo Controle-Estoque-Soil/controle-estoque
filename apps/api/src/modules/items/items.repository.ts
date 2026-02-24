@@ -9,7 +9,6 @@ export interface ItemCreateRecordInput {
   unitPrice: Prisma.Decimal;
   qtyOnHand: Prisma.Decimal;
   minQty?: Prisma.Decimal | null;
-  active: boolean;
 }
 
 export interface ItemUpdateRecordInput {
@@ -18,7 +17,6 @@ export interface ItemUpdateRecordInput {
   unit?: string;
   unitPrice?: Prisma.Decimal;
   minQty?: Prisma.Decimal | null;
-  active?: boolean;
 }
 
 export interface MovementCreateRecordInput {
@@ -38,10 +36,9 @@ export class ItemsRepository {
     return this.prisma.$transaction((tx) => callback(tx));
   }
 
-  list(filters: { search?: string; active?: boolean }) {
+  list(filters: { search?: string }) {
     return this.prisma.item.findMany({
       where: {
-        active: filters.active,
         ...(filters.search
           ? {
               OR: [
@@ -85,7 +82,6 @@ export class ItemsRepository {
         unitPrice: data.unitPrice,
         qtyOnHand: data.qtyOnHand,
         minQty: data.minQty ?? null,
-        active: data.active,
       },
     });
   }
@@ -97,10 +93,9 @@ export class ItemsRepository {
     });
   }
 
-  softDelete(id: string) {
-    return this.prisma.item.update({
+  delete(id: string) {
+    return this.prisma.item.delete({
       where: { id },
-      data: { active: false },
     });
   }
 

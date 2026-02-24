@@ -9,10 +9,9 @@ export class ProductsRepository {
     return this.prisma.$transaction((tx) => callback(tx));
   }
 
-  list(filters: { search?: string; active?: boolean }) {
+  list(filters: { search?: string }) {
     return this.prisma.product.findMany({
       where: {
-        active: filters.active,
         ...(filters.search
           ? {
               OR: [
@@ -51,23 +50,22 @@ export class ProductsRepository {
     });
   }
 
-  create(data: { name: string; sku: string; active: boolean }, db: DbClient = this.prisma) {
+  create(data: { name: string; sku: string }, db: DbClient = this.prisma) {
     return db.product.create({
       data,
     });
   }
 
-  update(id: string, data: { name?: string; sku?: string; active?: boolean }, db: DbClient = this.prisma) {
+  update(id: string, data: { name?: string; sku?: string }, db: DbClient = this.prisma) {
     return db.product.update({
       where: { id },
       data,
     });
   }
 
-  softDelete(id: string) {
-    return this.prisma.product.update({
+  delete(id: string) {
+    return this.prisma.product.delete({
       where: { id },
-      data: { active: false },
     });
   }
 

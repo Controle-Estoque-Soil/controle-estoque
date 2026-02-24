@@ -15,7 +15,6 @@ export interface ItemResponse {
   unitPrice: string;
   qtyOnHand: string;
   minQty: string | null;
-  active: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,7 +51,6 @@ function serializeItem(item: {
   unitPrice: Prisma.Decimal;
   qtyOnHand: Prisma.Decimal;
   minQty: Prisma.Decimal | null;
-  active: boolean;
   createdAt: Date;
   updatedAt: Date;
 }): ItemResponse {
@@ -64,7 +62,6 @@ function serializeItem(item: {
     unitPrice: decimalToString(item.unitPrice) ?? '0',
     qtyOnHand: decimalToString(item.qtyOnHand) ?? '0',
     minQty: decimalToString(item.minQty),
-    active: item.active,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
   };
@@ -102,7 +99,6 @@ export class ItemsService {
   async list(query: ItemListQuery): Promise<ItemResponse[]> {
     const items = await this.itemsRepository.list({
       search: query.search?.trim() || undefined,
-      active: query.active,
     });
 
     const filtered = query.belowMin
@@ -155,7 +151,6 @@ export class ItemsService {
           unitPrice,
           qtyOnHand,
           minQty,
-          active: input.active ?? true,
         },
         tx,
       );
@@ -197,7 +192,6 @@ export class ItemsService {
           : input.minQty === null
             ? null
             : toDecimal(input.minQty),
-      active: input.active,
     });
 
     return serializeItem(updated);
@@ -209,8 +203,15 @@ export class ItemsService {
       throw appErrors.notFound('Item not found');
     }
 
-    const item = await this.itemsRepository.softDelete(id);
-    return serializeItem(item);
+    try {
+      const item = await this.itemsRepository.delete(id);
+      return serializeItem(item);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw appErrors.conflict('Item nao pode ser removido porque possui movimentacoes/BOM/ordens vinculadas');
+      }
+      throw error;
+    }
   }
 
   async adjustStock(id: string, input: StockAdjustmentBody, actor: JwtUserPayload): Promise<ItemResponse> {

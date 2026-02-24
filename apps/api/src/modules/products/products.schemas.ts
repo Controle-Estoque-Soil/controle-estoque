@@ -16,7 +16,6 @@ export const productIdParamsSchema = z.object({
 export const productCreateBodySchema = z.object({
   name: z.string().min(1).max(150),
   sku: optionalSkuSchema,
-  active: z.boolean().optional().default(true),
 });
 
 export type ProductCreateBody = z.infer<typeof productCreateBodySchema>;
@@ -25,7 +24,6 @@ export const productUpdateBodySchema = z
   .object({
     name: z.string().min(1).max(150).optional(),
     sku: optionalSkuSchema,
-    active: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, 'At least one field is required');
 
@@ -33,10 +31,6 @@ export type ProductUpdateBody = z.infer<typeof productUpdateBodySchema>;
 
 export const productListQuerySchema = z.object({
   search: z.string().trim().optional(),
-  active: z
-    .enum(['true', 'false'])
-    .transform((value) => value === 'true')
-    .optional(),
 });
 
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;

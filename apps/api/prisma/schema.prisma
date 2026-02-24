@@ -48,14 +48,12 @@ model Item {
   unitPrice    Decimal            @db.Decimal(18, 6) @map("unit_price")
   qtyOnHand    Decimal            @db.Decimal(18, 6) @default(0) @map("qty_on_hand")
   minQty       Decimal?           @db.Decimal(18, 6) @map("min_qty")
-  active       Boolean            @default(true)
   createdAt    DateTime           @default(now()) @map("created_at")
   updatedAt    DateTime           @updatedAt @map("updated_at")
   bomItems     ProductBomItem[]
   movements    StockMovement[]
   orderLines   ProductOrderLine[]
 
-  @@index([active])
   @@index([name])
   @@map("items")
 }
@@ -64,13 +62,11 @@ model Product {
   id        String           @id @default(cuid())
   name      String
   sku       String           @unique
-  active    Boolean          @default(true)
   createdAt DateTime         @default(now()) @map("created_at")
   updatedAt DateTime         @updatedAt @map("updated_at")
   bomItems  ProductBomItem[]
   orders    ProductOrder[]
 
-  @@index([active])
   @@index([name])
   @@map("products")
 }

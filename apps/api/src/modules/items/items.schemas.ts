@@ -25,7 +25,6 @@ export const itemCreateBodySchema = z.object({
   unitPrice: nonNegativeDecimalStringSchema,
   qtyOnHand: nonNegativeDecimalStringSchema.default('0'),
   minQty: nonNegativeDecimalStringSchema,
-  active: z.boolean().optional().default(true),
 });
 
 export type ItemCreateBody = z.infer<typeof itemCreateBodySchema>;
@@ -37,7 +36,6 @@ export const itemUpdateBodySchema = z
     unit: z.string().min(1).max(20).optional(),
     unitPrice: nonNegativeDecimalStringSchema.optional(),
     minQty: nonNegativeDecimalStringSchema.nullable().optional(),
-    active: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, 'At least one field is required');
 
@@ -45,10 +43,6 @@ export type ItemUpdateBody = z.infer<typeof itemUpdateBodySchema>;
 
 export const itemListQuerySchema = z.object({
   search: z.string().trim().optional(),
-  active: z
-    .enum(['true', 'false'])
-    .transform((value) => value === 'true')
-    .optional(),
   belowMin: z
     .enum(['true', 'false'])
     .transform((value) => value === 'true')

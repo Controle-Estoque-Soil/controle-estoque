@@ -7,7 +7,7 @@ import { useAuth } from '@/components/auth-provider';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal } from '@/lib/format';
 
-type ItemOption = { id: string; name: string; sku: string; unit: string; active: boolean };
+type ItemOption = { id: string; name: string; sku: string; unit: string };
 
 type MovementRecord = {
   id: string;
@@ -30,7 +30,7 @@ type OrderDetailRecord = {
   unitCost: string;
   note: string | null;
   createdAt: string;
-  product: { id: string; name: string; sku: string; active: boolean };
+  product: { id: string; name: string; sku: string };
   createdByUser: { id: string; email: string; role: string };
   lines: Array<{
     id: string;
