@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
@@ -46,6 +46,12 @@ type OrderDetailRecord = {
     lineCost: string;
     item: { id: string; name: string; sku: string; unit: string };
   }>;
+};
+
+type MovementDisplayRow = {
+  key: string;
+  rowType: 'product' | 'item';
+  movement: MovementRecord;
 };
 
 function toIsoOrUndefined(value: string): string | undefined {
@@ -99,6 +105,26 @@ export default function MovementsPage() {
   const [selectedOrder, setSelectedOrder] = useState<OrderDetailRecord | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+
+  const displayRows = useMemo<MovementDisplayRow[]>(() => {
+    const rows: MovementDisplayRow[] = [];
+    const seenProductOrderRefs = new Set<string>();
+
+    for (const movement of movements) {
+      if (movement.productOrder && movement.referenceId) {
+        const key = `PRODUCT_ORDER:${movement.referenceId}`;
+        if (seenProductOrderRefs.has(key)) {
+          continue;
+        }
+        seenProductOrderRefs.add(key);
+        rows.push({ key, rowType: 'product', movement });
+      } else {
+        rows.push({ key: movement.id, rowType: 'item', movement });
+      }
+    }
+
+    return rows;
+  }, [movements]);
 
   async function loadItems() {
     if (!token) {
@@ -278,16 +304,18 @@ export default function MovementsPage() {
                   <tr>
                     <td colSpan={9}>Carregando...</td>
                   </tr>
-                ) : movements.length === 0 ? (
+                ) : displayRows.length === 0 ? (
                   <tr>
                     <td colSpan={9}>Nenhuma movimentacao encontrada.</td>
                   </tr>
                 ) : (
-                  movements.map((movement) => {
+                  displayRows.map((row) => {
+                    const movement = row.movement;
                     const isOrderMovement = canOpenOrderDetail(movement);
+                    const isProductRow = row.rowType === 'product' && movement.productOrder != null;
                     return (
                       <tr
-                        key={movement.id}
+                        key={row.key}
                         className={selectedMovementId === movement.id ? 'table-row-selected' : undefined}
                         onClick={isOrderMovement ? () => void openMovementDetail(movement) : undefined}
                         style={isOrderMovement ? { cursor: 'pointer' } : undefined}
@@ -295,14 +323,10 @@ export default function MovementsPage() {
                       >
                         <td>{formatDateTime(movement.createdAt)}</td>
                         <td>
-                          {movement.productOrder ? (
+                          {isProductRow ? (
                             <>
-                              {movement.productOrder.product.name}
-                              <div className="small">{movement.productOrder.product.sku}</div>
-                              <div className="small">
-                                {movement.productOrder.type === 'OUTBOUND_PRODUCT' ? 'Saída' : 'Chegada'} de{' '}
-                                {formatDecimal(movement.productOrder.productQty)} produto(s)
-                              </div>
+                              {movement.productOrder!.product.name}
+                              <div className="small">{movement.productOrder!.product.sku}</div>
                             </>
                           ) : (
                             <>
@@ -312,7 +336,15 @@ export default function MovementsPage() {
                           )}
                         </td>
                         <td>
-                          {formatDecimal(movement.deltaQty)} {movement.item.unit}
+                          {isProductRow ? (
+                            <>
+                              {movement.productOrder!.type === 'OUTBOUND_PRODUCT' ? '-' : '+'}{formatDecimal(movement.productOrder!.productQty)} un
+                            </>
+                          ) : (
+                            <>
+                              {formatDecimal(movement.deltaQty)} {movement.item.unit}
+                            </>
+                          )}
                         </td>
                         <td>{formatMovementReason(movement.reason, movement.deltaQty)}</td>
                         <td>
