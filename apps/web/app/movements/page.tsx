@@ -20,6 +20,12 @@ type MovementRecord = {
   createdAt: string;
   item: { id: string; name: string; sku: string; unit: string };
   createdByUser: { id: string; email: string; role: string };
+  productOrder: null | {
+    id: string;
+    type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
+    productQty: string;
+    product: { id: string; name: string; sku: string };
+  };
 };
 
 type OrderDetailRecord = {
@@ -257,7 +263,7 @@ export default function MovementsPage() {
               <thead>
                 <tr>
                   <th>Data</th>
-                  <th>Item</th>
+                  <th>Movimentação</th>
                   <th>Delta</th>
                   <th>Motivo</th>
                   <th>Referencia</th>
@@ -289,8 +295,21 @@ export default function MovementsPage() {
                       >
                         <td>{formatDateTime(movement.createdAt)}</td>
                         <td>
-                          {movement.item.name}
-                          <div className="small">{movement.item.sku}</div>
+                          {movement.productOrder ? (
+                            <>
+                              {movement.productOrder.product.name}
+                              <div className="small">{movement.productOrder.product.sku}</div>
+                              <div className="small">
+                                {movement.productOrder.type === 'OUTBOUND_PRODUCT' ? 'Saída' : 'Chegada'} de{' '}
+                                {formatDecimal(movement.productOrder.productQty)} produto(s)
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {movement.item.name}
+                              <div className="small">{movement.item.sku}</div>
+                            </>
+                          )}
                         </td>
                         <td>
                           {formatDecimal(movement.deltaQty)} {movement.item.unit}

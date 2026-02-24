@@ -188,6 +188,23 @@ export class OperationsRepository {
     });
   }
 
+  getOrdersByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this.prisma.productOrder.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      include: {
+        product: true,
+      },
+    });
+  }
+
   getOrderById(id: string, db: DbClient = this.prisma) {
     return db.productOrder.findUnique({
       where: { id },

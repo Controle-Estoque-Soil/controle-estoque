@@ -310,7 +310,37 @@ export class OperationsService {
       to: dateRange.to,
     });
 
+    const productOrderIds = Array.from(
+      new Set(
+        movements
+          .filter((movement) => movement.referenceType === 'PRODUCT_ORDER' && movement.referenceId)
+          .map((movement) => movement.referenceId as string),
+      ),
+    );
+
+    const productOrders = await this.operationsRepository.getOrdersByIds(productOrderIds);
+    const productOrdersMap = new Map(productOrders.map((order) => [order.id, order]));
+
     return movements.map((movement) => ({
+      productOrder:
+        movement.referenceType === 'PRODUCT_ORDER' && movement.referenceId
+          ? (() => {
+              const order = productOrdersMap.get(movement.referenceId);
+              if (!order) {
+                return null;
+              }
+              return {
+                id: order.id,
+                type: order.type,
+                productQty: decimalToString(order.productQty) ?? '0',
+                product: {
+                  id: order.product.id,
+                  name: order.product.name,
+                  sku: order.product.sku,
+                },
+              };
+            })()
+          : null,
       id: movement.id,
       itemId: movement.itemId,
       deltaQty: decimalToString(movement.deltaQty) ?? '0',
