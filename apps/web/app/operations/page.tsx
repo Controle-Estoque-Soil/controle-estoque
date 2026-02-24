@@ -217,8 +217,13 @@ export default function OperationsPage() {
 
             <div className="form-grid">
               <div className="field">
-                <label>Produto</label>
-                <select className="select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
+                <label htmlFor="operation-product">Produto</label>
+                <select
+                  id="operation-product"
+                  className="select"
+                  value={form.productId}
+                  onChange={(e) => setForm({ ...form, productId: e.target.value })}
+                >
                   <option value="">Selecione...</option>
                   {products.map((product) => (
                     <option key={product.id} value={product.id}>
@@ -228,12 +233,22 @@ export default function OperationsPage() {
                 </select>
               </div>
               <div className="field">
-                <label>Quantidade de produtos</label>
-                <input className="input" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
+                <label htmlFor="operation-product-qty">Quantidade de produtos</label>
+                <input
+                  id="operation-product-qty"
+                  className="input"
+                  value={form.qty}
+                  onChange={(e) => setForm({ ...form, qty: e.target.value })}
+                />
               </div>
               <div className="field full">
-                <label>Nota (opcional)</label>
-                <textarea className="textarea" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+                <label htmlFor="operation-note">Nota (opcional)</label>
+                <textarea
+                  id="operation-note"
+                  className="textarea"
+                  value={form.note}
+                  onChange={(e) => setForm({ ...form, note: e.target.value })}
+                />
               </div>
               {user?.role === 'ADMIN' ? (
                 <div className="field full checkbox-row">

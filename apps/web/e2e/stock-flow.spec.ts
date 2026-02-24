@@ -33,7 +33,7 @@ test.describe.serial('stock platform e2e', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
     await login(page);
-    await expect(page.getByText(ADMIN_EMAIL)).toBeVisible();
+    await expect(page.locator('.topbar-title')).toHaveText(ADMIN_EMAIL);
   });
 
   test('flow 1: create item/product/BOM and outbound qty=2 updates stock and cost', async ({ page }) => {

@@ -299,12 +299,22 @@ export default function ProductsPage() {
             <h2>Criar produto</h2>
             <form className="form-grid" onSubmit={handleCreate}>
               <div className="field">
-                <label>Nome</label>
-                <input className="input" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
+                <label htmlFor="create-product-name">Nome</label>
+                <input
+                  id="create-product-name"
+                  className="input"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                />
               </div>
               <div className="field">
-                <label>SKU</label>
-                <input className="input" value={createForm.sku} onChange={(e) => setCreateForm({ ...createForm, sku: e.target.value })} />
+                <label htmlFor="create-product-sku">SKU</label>
+                <input
+                  id="create-product-sku"
+                  className="input"
+                  value={createForm.sku}
+                  onChange={(e) => setCreateForm({ ...createForm, sku: e.target.value })}
+                />
               </div>
               <div className="field full checkbox-row">
                 <input
@@ -331,12 +341,22 @@ export default function ProductsPage() {
               <div className="grid">
                 <form className="form-grid" onSubmit={handleUpdate}>
                   <div className="field">
-                    <label>Nome</label>
-                    <input className="input" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                    <label htmlFor="edit-product-name">Nome</label>
+                    <input
+                      id="edit-product-name"
+                      className="input"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    />
                   </div>
                   <div className="field">
-                    <label>SKU</label>
-                    <input className="input" value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} />
+                    <label htmlFor="edit-product-sku">SKU</label>
+                    <input
+                      id="edit-product-sku"
+                      className="input"
+                      value={editForm.sku}
+                      onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })}
+                    />
                   </div>
                   <div className="field full checkbox-row">
                     <input
