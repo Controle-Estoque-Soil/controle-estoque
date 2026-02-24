@@ -171,7 +171,7 @@ jobs:
             COMPOSE=\"docker compose --env-file deploy/aws-ec2/.env.prod -f deploy/aws-ec2/docker-compose.prod.yml\"
             \$COMPOSE up -d inventory-postgres
             \$COMPOSE build inventory-api
-            \$COMPOSE run --rm inventory-api npm run prisma:migrate:deploy
+            \$COMPOSE run --rm --entrypoint npm inventory-api run prisma:migrate:deploy
             \$COMPOSE up -d inventory-api
             if [ \"\${ENABLE_PROXY}\" = \"true\" ]; then
               \$COMPOSE --profile proxy up -d inventory-proxy
