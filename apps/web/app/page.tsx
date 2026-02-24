@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal, formatMovementReason } from '@/lib/format';
+import { formatDateTime, formatDecimal } from '@/lib/format';
 
 type ItemRecord = {
   id: string;
@@ -16,22 +16,71 @@ type ItemRecord = {
   minQty: string | null;
 };
 
-type MovementRecord = {
+type OrderListRecord = {
   id: string;
-  item: { id: string; name: string; sku: string; unit: string };
-  deltaQty: string;
-  reason: string;
+  type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
+  productQty: string;
+  totalCost: string;
+  unitCost: string;
+  note: string | null;
   createdAt: string;
-  createdByUser: { email: string };
+  product: { id: string; name: string; sku: string };
+  createdByUser: { id: string; email: string; role: string };
+  linesCount: number;
 };
+
+type OrderDetailRecord = {
+  id: string;
+  type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
+  productId: string;
+  productQty: string;
+  totalCost: string;
+  unitCost: string;
+  note: string | null;
+  createdAt: string;
+  product: { id: string; name: string; sku: string };
+  createdByUser: { id: string; email: string; role: string };
+  lines: Array<{
+    id: string;
+    itemId: string;
+    itemQty: string;
+    itemUnitPriceSnapshot: string;
+    lineCost: string;
+    item: { id: string; name: string; sku: string; unit: string };
+  }>;
+};
+
+function formatProductOperationType(type: OrderListRecord['type'] | OrderDetailRecord['type']): string {
+  return type === 'OUTBOUND_PRODUCT' ? 'Saida de produto' : 'Chegada de produto';
+}
 
 export default function DashboardPage() {
   const { token } = useAuth();
   const [items, setItems] = useState<ItemRecord[]>([]);
   const [belowMin, setBelowMin] = useState<ItemRecord[]>([]);
-  const [movements, setMovements] = useState<MovementRecord[]>([]);
+  const [recentOperations, setRecentOperations] = useState<OrderListRecord[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<OrderDetailRecord | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  async function loadOrderDetail(orderId: string) {
+    if (!token) {
+      return;
+    }
+
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const response = await apiRequest<{ data: OrderDetailRecord }>(`/operations/${orderId}`, { token });
+      setSelectedOrder(response.data);
+    } catch (caughtError) {
+      setDetailError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar detalhes da operacao');
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!token) {
@@ -41,16 +90,17 @@ export default function DashboardPage() {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setDetailError(null);
 
     Promise.all([
       apiRequest<{ data: ItemRecord[] }>('/items', { token, signal: controller.signal }),
       apiRequest<{ data: ItemRecord[] }>('/items?belowMin=true', { token, signal: controller.signal }),
-      apiRequest<{ data: MovementRecord[] }>('/movements', { token, signal: controller.signal }),
+      apiRequest<{ data: OrderListRecord[] }>('/operations', { token, signal: controller.signal }),
     ])
-      .then(([itemsResponse, belowMinResponse, movementsResponse]) => {
+      .then(([itemsResponse, belowMinResponse, operationsResponse]) => {
         setItems(itemsResponse.data);
         setBelowMin(belowMinResponse.data);
-        setMovements(movementsResponse.data.slice(0, 10));
+        setRecentOperations(operationsResponse.data.slice(0, 10));
       })
       .catch((caughtError) => {
         if (caughtError instanceof ApiError) {
@@ -73,7 +123,7 @@ export default function DashboardPage() {
           <div className="page-header">
             <div>
               <h1 className="page-title">Dashboard</h1>
-              <p className="page-subtitle">Visão rápida do estoque e últimas movimentações.</p>
+              <p className="page-subtitle">Visao rapida do estoque e ultimas operacoes de produto.</p>
             </div>
           </div>
           {error ? <p className="inline-error">{error}</p> : null}
@@ -85,53 +135,115 @@ export default function DashboardPage() {
             </div>
             <div className="kpi-card">
               <div className="card-value">{belowMin.length}</div>
-              <div className="card-label">Itens abaixo do mínimo</div>
+              <div className="card-label">Itens abaixo do minimo</div>
             </div>
             <div className="kpi-card">
-              <div className="card-value">{movements.length}</div>
-              <div className="card-label">Últimas movimentações</div>
+              <div className="card-value">{recentOperations.length}</div>
+              <div className="card-label">Ultimas operacoes de produto</div>
             </div>
           </div>
         </section>
 
         <section className="panel">
-          <h2>Últimas movimentações</h2>
+          <h2>Ultimas movimentacoes de produto</h2>
+          <p className="small">
+            Cada linha representa uma operacao de produto. Clique em "Exibir detalhes" para ver os itens que sairam/chegaram.
+          </p>
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
                   <th>Quando</th>
-                  <th>Item</th>
+                  <th>Produto</th>
                   <th>Delta</th>
                   <th>Motivo</th>
-                  <th>Usuário</th>
+                  <th>Itens</th>
+                  <th>Usuario</th>
+                  <th>Detalhe</th>
                 </tr>
               </thead>
               <tbody>
-                {movements.length === 0 ? (
+                {recentOperations.length === 0 ? (
                   <tr>
-                    <td colSpan={5}>Nenhuma movimentação registrada.</td>
+                    <td colSpan={7}>Nenhuma operacao de produto registrada.</td>
                   </tr>
                 ) : (
-                  movements.map((movement) => (
-                    <tr key={movement.id}>
-                      <td>{formatDateTime(movement.createdAt)}</td>
+                  recentOperations.map((operation) => (
+                    <tr key={operation.id} className={selectedOrder?.id === operation.id ? 'table-row-selected' : undefined}>
+                      <td>{formatDateTime(operation.createdAt)}</td>
                       <td>
-                        <strong>{movement.item.name}</strong>
-                        <div className="small">{movement.item.sku}</div>
+                        <strong>{operation.product.name}</strong>
+                        <div className="small">{operation.product.sku}</div>
                       </td>
-                      <td>{formatDecimal(movement.deltaQty)} {movement.item.unit}</td>
-                      <td>{formatMovementReason(movement.reason, movement.deltaQty)}</td>
-                      <td>{movement.createdByUser.email}</td>
+                      <td>
+                        {operation.type === 'OUTBOUND_PRODUCT' ? '-' : '+'}
+                        {formatDecimal(operation.productQty)} un
+                      </td>
+                      <td>{formatProductOperationType(operation.type)}</td>
+                      <td>{operation.linesCount}</td>
+                      <td>{operation.createdByUser.email}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="button ghost"
+                          onClick={() => void loadOrderDetail(operation.id)}
+                        >
+                          Exibir detalhes
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+
+          {(detailLoading || detailError || selectedOrder) ? (
+            <div className="grid" style={{ marginTop: '1rem' }}>
+              <div className="separator" />
+              <h3>Detalhes da movimentacao selecionada</h3>
+              {detailLoading ? <p className="small">Carregando itens da operacao...</p> : null}
+              {detailError ? <p className="inline-error">{detailError}</p> : null}
+              {selectedOrder ? (
+                <>
+                  <p className="small">
+                    {formatProductOperationType(selectedOrder.type)} | {selectedOrder.product.name} ({selectedOrder.product.sku}) | qtd{' '}
+                    {formatDecimal(selectedOrder.productQty)} | custo total {formatDecimal(selectedOrder.totalCost)} |{' '}
+                    {formatDateTime(selectedOrder.createdAt)}
+                  </p>
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th>Qtd</th>
+                          <th>Preco snapshot</th>
+                          <th>Custo linha</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedOrder.lines.map((line) => (
+                          <tr key={line.id}>
+                            <td>
+                              {line.item.name}
+                              <div className="small">{line.item.sku}</div>
+                            </td>
+                            <td>
+                              {formatDecimal(line.itemQty)} {line.item.unit}
+                            </td>
+                            <td>{formatDecimal(line.itemUnitPriceSnapshot)}</td>
+                            <td>{formatDecimal(line.lineCost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </section>
       </AppShell>
     </RequireAuth>
   );
 }
-
