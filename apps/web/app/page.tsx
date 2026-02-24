@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatMovementReason } from '@/lib/format';
 
 type ItemRecord = {
   id: string;
@@ -121,7 +121,7 @@ export default function DashboardPage() {
                         <div className="small">{movement.item.sku}</div>
                       </td>
                       <td>{formatDecimal(movement.deltaQty)} {movement.item.unit}</td>
-                      <td>{movement.reason}</td>
+                      <td>{formatMovementReason(movement.reason, movement.deltaQty)}</td>
                       <td>{movement.createdByUser.email}</td>
                     </tr>
                   ))

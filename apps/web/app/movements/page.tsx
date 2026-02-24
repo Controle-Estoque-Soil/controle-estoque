@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatMovementReason } from '@/lib/format';
 
 type ItemOption = { id: string; name: string; sku: string; unit: string };
 
@@ -195,9 +195,9 @@ export default function MovementsPage() {
                 <label>Motivo</label>
                 <select className="select" value={filters.reason} onChange={(e) => setFilters({ ...filters, reason: e.target.value })}>
                   <option value="">Todos</option>
-                  <option value="MANUAL_ADJUSTMENT">MANUAL_ADJUSTMENT</option>
-                  <option value="PRODUCT_INBOUND">PRODUCT_INBOUND</option>
-                  <option value="PRODUCT_OUTBOUND">PRODUCT_OUTBOUND</option>
+                  <option value="MANUAL_ADJUSTMENT">Saida/Chegada de item</option>
+                  <option value="PRODUCT_INBOUND">Chegada de produto</option>
+                  <option value="PRODUCT_OUTBOUND">Saida de produto</option>
                 </select>
               </div>
               <div className="field">
@@ -285,7 +285,7 @@ export default function MovementsPage() {
                         <td>
                           {formatDecimal(movement.deltaQty)} {movement.item.unit}
                         </td>
-                        <td>{movement.reason}</td>
+                        <td>{formatMovementReason(movement.reason, movement.deltaQty)}</td>
                         <td>
                           {movement.referenceType}
                           {movement.referenceId ? ` / ${movement.referenceId}` : ''}

@@ -7,7 +7,7 @@ import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { DeleteActionDialog } from '@/components/delete-action-dialog';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatMovementReason } from '@/lib/format';
 import { itemFormSchema } from '@/lib/schemas';
 
 type ItemRecord = {
@@ -525,7 +525,7 @@ export default function ItemsPage() {
                             <tr key={movement.id}>
                               <td>{formatDateTime(movement.createdAt)}</td>
                               <td>{formatDecimal(movement.deltaQty)}</td>
-                              <td>{movement.reason}</td>
+                              <td>{formatMovementReason(movement.reason, movement.deltaQty)}</td>
                               <td>{movement.referenceType}{movement.referenceId ? ` / ${movement.referenceId}` : ''}</td>
                               <td>{movement.createdByUser.email}</td>
                               <td>{movement.note ?? '-'}</td>

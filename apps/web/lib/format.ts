@@ -23,3 +23,19 @@ export function formatDateTime(value: string): string {
   return date.toLocaleString('pt-BR');
 }
 
+export function formatMovementReason(
+  reason: string,
+  deltaQty?: string | null,
+): 'Saida de produto' | 'Chegada de produto' | 'Saida de item' | 'Chegada de item' {
+  if (reason === 'PRODUCT_OUTBOUND') {
+    return 'Saida de produto';
+  }
+
+  if (reason === 'PRODUCT_INBOUND') {
+    return 'Chegada de produto';
+  }
+
+  const delta = Number(deltaQty ?? '0');
+  return Number.isFinite(delta) && delta < 0 ? 'Saida de item' : 'Chegada de item';
+}
+
