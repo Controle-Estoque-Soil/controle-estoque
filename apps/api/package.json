@@ -4,7 +4,9 @@
   "private": true,
   "main": "dist/index.js",
   "scripts": {
+    "predev": "npm run build -w @controle/shared",
     "dev": "tsx watch src/index.ts",
+    "prestart:e2e": "npm run build -w @controle/shared",
     "start:e2e": "tsx src/index.ts",
     "prebuild": "prisma generate",
     "build": "tsc -p tsconfig.build.json",
@@ -16,7 +18,7 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "prisma:generate": "prisma generate",
-    "prisma:migrate:reset": "prisma migrate reset --force --skip-seed",
+    "prisma:migrate:reset": "prisma migrate reset --force --skip-seed --skip-generate",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts"
   },

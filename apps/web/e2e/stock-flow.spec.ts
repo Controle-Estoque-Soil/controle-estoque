@@ -81,7 +81,7 @@ test.describe.serial('stock platform e2e', () => {
       await expect(page.getByRole('button', { name: 'Gerar preview' })).toBeVisible();
     });
 
-    await page.getByLabel('Produto').selectOption({ index: 1 });
+    await page.getByLabel('Produto', { exact: true }).selectOption({ index: 1 });
     await page.getByLabel('Quantidade de produtos').fill('2');
     await page.getByRole('button', { name: 'Gerar preview' }).click();
 
@@ -106,7 +106,7 @@ test.describe.serial('stock platform e2e', () => {
       await expect(page.getByRole('button', { name: 'Gerar preview' })).toBeVisible();
     });
     await page.getByRole('button', { name: /Registrar entrada/ }).click();
-    await page.getByLabel('Produto').selectOption({ index: 1 });
+    await page.getByLabel('Produto', { exact: true }).selectOption({ index: 1 });
     await page.getByLabel('Quantidade de produtos').fill('3');
     await page.getByRole('button', { name: 'Gerar preview' }).click();
     await expect(page.getByRole('button', { name: /Confirmar/ })).toBeEnabled();
@@ -126,7 +126,7 @@ test.describe.serial('stock platform e2e', () => {
       await expect(page.getByRole('button', { name: 'Gerar preview' })).toBeVisible();
     });
     await page.getByRole('button', { name: /Registrar sa/ }).click();
-    await page.getByLabel('Produto').selectOption({ index: 1 });
+    await page.getByLabel('Produto', { exact: true }).selectOption({ index: 1 });
     await page.getByLabel('Quantidade de produtos').fill('100');
     await page.getByRole('button', { name: 'Gerar preview' }).click();
 

@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "npm run build -w @controle/shared",
     "dev": "next dev",
+    "predev:e2e": "npm run build -w @controle/shared",
     "dev:e2e": "next dev --hostname 127.0.0.1 --port 3000",
+    "prebuild": "npm run build -w @controle/shared",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

@@ -10,9 +10,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "concurrently -n api,web -c cyan,yellow \"npm run dev -w @controle/api\" \"npm run dev -w @controle/web\"",
-    "dev:api": "npm run dev -w @controle/api",
-    "dev:web": "npm run dev -w @controle/web",
+    "dev": "npm run build -w @controle/shared && concurrently -n shared,api,web -c green,cyan,yellow \"npm run dev -w @controle/shared\" \"npm run dev -w @controle/api\" \"npm run dev -w @controle/web\"",
+    "dev:api": "npm run build -w @controle/shared && npm run dev -w @controle/api",
+    "dev:web": "npm run build -w @controle/shared && npm run dev -w @controle/web",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose stop postgres",
     "docker:up": "docker compose up --build",
