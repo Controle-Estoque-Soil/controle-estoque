@@ -352,7 +352,7 @@ export default function OperationsPage() {
       token,
       body: {
         deltaQty: buildSignedDelta(mode, payload.qty),
-        note: payload.note?.trim() || `Operacao de item (${mode}) pela tela de operacoes`,
+        note: `[ITEM_DIRETO_${mode.toUpperCase()}] ${payload.note.trim()}`,
         allowNegativeOverride: payload.allowNegativeOverride,
       },
     });
@@ -534,7 +534,9 @@ export default function OperationsPage() {
               )}
 
               <div className="field full">
-                <label htmlFor="operation-note">Nota (opcional)</label>
+                <label htmlFor="operation-note">
+                  {target === 'item' ? 'Nota (obrigatoria para item)' : 'Nota (opcional)'}
+                </label>
                 <textarea
                   id="operation-note"
                   className="textarea"

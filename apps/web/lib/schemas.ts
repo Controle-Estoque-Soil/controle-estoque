@@ -1,24 +1,24 @@
 import { z } from 'zod';
 
 export const itemFormSchema = z.object({
-  name: z.string().min(1, 'Nome é obrigatório'),
-  sku: z.string().min(1, 'SKU é obrigatório'),
-  unit: z.string().min(1, 'Unidade é obrigatória'),
-  unitPrice: z.string().regex(/^\d+(\.\d+)?$/, 'Preço inválido'),
-  qtyOnHand: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade inválida').default('0'),
-  minQty: z.string().regex(/^\d+(\.\d+)?$/, 'Estoque mínimo inválido').optional().or(z.literal('')),
+  name: z.string().min(1, 'Nome e obrigatorio'),
+  sku: z.string().min(1, 'SKU e obrigatorio'),
+  unit: z.string().min(1, 'Unidade e obrigatoria'),
+  unitPrice: z.string().regex(/^\d+(\.\d+)?$/, 'Preco invalido'),
+  qtyOnHand: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invalida').default('0'),
+  minQty: z.string().regex(/^\d+(\.\d+)?$/, 'Estoque minimo invalido').optional().or(z.literal('')),
   active: z.boolean().default(true),
 });
 
 export const productFormSchema = z.object({
-  name: z.string().min(1, 'Nome é obrigatório'),
-  sku: z.string().min(1, 'SKU é obrigatório'),
+  name: z.string().min(1, 'Nome e obrigatorio'),
+  sku: z.string().min(1, 'SKU e obrigatorio'),
   active: z.boolean().default(true),
 });
 
 export const operationFormSchema = z.object({
   productId: z.string().min(1, 'Selecione um produto'),
-  qty: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade inválida').refine((value) => Number(value) > 0, {
+  qty: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invalida').refine((value) => Number(value) > 0, {
     message: 'Quantidade deve ser maior que zero',
   }),
   note: z.string().optional(),
@@ -27,17 +27,16 @@ export const operationFormSchema = z.object({
 
 export const itemOperationFormSchema = z.object({
   itemId: z.string().min(1, 'Selecione um item'),
-  qty: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invÃ¡lida').refine((value) => Number(value) > 0, {
+  qty: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invalida').refine((value) => Number(value) > 0, {
     message: 'Quantidade deve ser maior que zero',
   }),
-  note: z.string().optional(),
+  note: z.string().trim().min(1, 'Nota e obrigatoria para operacao por item'),
   allowNegativeOverride: z.boolean().default(false),
 });
 
 export const bomLineSchema = z.object({
   itemId: z.string().min(1, 'Selecione um item'),
-  qtyRequired: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade inválida').refine((value) => Number(value) > 0, {
+  qtyRequired: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invalida').refine((value) => Number(value) > 0, {
     message: 'Quantidade deve ser maior que zero',
   }),
 });
-

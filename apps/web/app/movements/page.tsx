@@ -57,6 +57,31 @@ function canOpenOrderDetail(movement: MovementRecord): boolean {
   return movement.referenceType === 'PRODUCT_ORDER' && Boolean(movement.referenceId);
 }
 
+function isStandaloneItemMovement(movement: MovementRecord): boolean {
+  if (movement.referenceType !== 'MANUAL_ADJUSTMENT') {
+    return false;
+  }
+
+  if (movement.note?.startsWith('[ITEM_DIRETO_')) {
+    return true;
+  }
+
+  return Number(movement.deltaQty) < 0;
+}
+
+function movementSourceLabel(movement: MovementRecord): string {
+  if (canOpenOrderDetail(movement)) {
+    return 'Produto';
+  }
+  if (isStandaloneItemMovement(movement)) {
+    return 'Item direto';
+  }
+  if (movement.referenceType === 'MANUAL_ADJUSTMENT') {
+    return 'Ajuste manual';
+  }
+  return movement.referenceType;
+}
+
 export default function MovementsPage() {
   const { token } = useAuth();
   const [items, setItems] = useState<ItemOption[]>([]);
@@ -228,17 +253,18 @@ export default function MovementsPage() {
                   <th>Referencia</th>
                   <th>Usuario</th>
                   <th>Nota</th>
+                  <th>Origem</th>
                   <th>Detalhe</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8}>Carregando...</td>
+                    <td colSpan={9}>Carregando...</td>
                   </tr>
                 ) : movements.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>Nenhuma movimentacao encontrada.</td>
+                    <td colSpan={9}>Nenhuma movimentacao encontrada.</td>
                   </tr>
                 ) : (
                   movements.map((movement) => {
@@ -265,7 +291,17 @@ export default function MovementsPage() {
                           {movement.referenceId ? ` / ${movement.referenceId}` : ''}
                         </td>
                         <td>{movement.createdByUser.email}</td>
-                        <td>{movement.note ?? '-'}</td>
+                        <td>
+                          {movement.note ?? '-'}
+                          {isStandaloneItemMovement(movement) ? (
+                            <div className="small" style={{ color: '#166534' }}>Saida/entrada de item fora de produto</div>
+                          ) : null}
+                        </td>
+                        <td>
+                          <span className={`badge ${canOpenOrderDetail(movement) ? 'ok' : isStandaloneItemMovement(movement) ? 'warn' : ''}`}>
+                            {movementSourceLabel(movement)}
+                          </span>
+                        </td>
                         <td>
                           {isOrderMovement ? (
                             <button
