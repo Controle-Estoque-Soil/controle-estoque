@@ -21,3 +21,15 @@ export type AppConfig = z.infer<typeof envSchema>;
 export function loadEnvConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return envSchema.parse(env);
 }
+
+export function getAllowedCorsOrigins(config: AppConfig): string[] {
+  const csv = config.CORS_ORIGINS?.trim();
+  if (csv) {
+    return csv
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+  }
+
+  return [config.CORS_ORIGIN];
+}

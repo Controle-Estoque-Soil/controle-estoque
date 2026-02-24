@@ -28,6 +28,7 @@
   "dependencies": {
     "@controle/shared": "file:../../packages/shared",
     "@fastify/cors": "^8.5.0",
+    "@fastify/helmet": "^11.1.1",
     "@fastify/jwt": "^8.0.1",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",

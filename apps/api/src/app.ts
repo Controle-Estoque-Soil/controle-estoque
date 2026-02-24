@@ -1,7 +1,8 @@
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import Fastify, { type FastifyInstance } from 'fastify';
 
-import type { AppConfig } from './config/env';
+import { getAllowedCorsOrigins, type AppConfig } from './config/env';
 import { apiErrorHandler } from './core/error-handler';
 import { authRoutes } from './modules/auth/auth.routes';
 import { healthRoutes } from './modules/health/health.routes';
@@ -12,11 +13,17 @@ import { authPlugin } from './plugins/auth';
 import { prismaPlugin } from './plugins/prisma';
 
 export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
+  const corsOrigins = getAllowedCorsOrigins(config);
+
   const app = Fastify({
+    trustProxy: config.TRUST_PROXY,
     logger:
       config.NODE_ENV === 'production'
-        ? true
+        ? {
+            level: config.LOG_LEVEL,
+          }
         : {
+            level: config.LOG_LEVEL,
             transport: {
               target: 'pino-pretty',
             },
@@ -27,8 +34,22 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
 
   app.setErrorHandler(apiErrorHandler);
 
+  if (config.ENABLE_SECURITY_HEADERS) {
+    await app.register(helmet, {
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    });
+  }
+
   await app.register(cors, {
-    origin: config.CORS_ORIGIN,
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, corsOrigins.includes(origin));
+    },
     credentials: true,
   });
 
