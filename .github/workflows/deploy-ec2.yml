@@ -133,7 +133,7 @@ jobs:
             if git rev-parse --verify HEAD >/dev/null 2>&1; then
               git rev-parse HEAD > .previous_deploy_sha
             fi
-            git fetch --all --tags --prune origin
+            git fetch --tags --prune origin
             git checkout main
             git reset --hard ${DEPLOY_SHA}
             echo ${DEPLOY_SHA} > .current_deploy_sha
