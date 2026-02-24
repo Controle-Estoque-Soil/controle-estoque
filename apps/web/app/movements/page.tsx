@@ -86,7 +86,7 @@ export default function MovementsPage() {
   const { token } = useAuth();
   const [items, setItems] = useState<ItemOption[]>([]);
   const [movements, setMovements] = useState<MovementRecord[]>([]);
-  const [filters, setFilters] = useState({ itemId: '', reason: '', from: '', to: '' });
+  const [filters, setFilters] = useState({ itemId: '', reason: '', reference: '', from: '', to: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
@@ -112,6 +112,7 @@ export default function MovementsPage() {
       const params = new URLSearchParams();
       if (filters.itemId) params.set('itemId', filters.itemId);
       if (filters.reason) params.set('reason', filters.reason);
+      if (filters.reference.trim()) params.set('reference', filters.reference.trim());
       const from = toIsoOrUndefined(filters.from);
       const to = toIsoOrUndefined(filters.to);
       if (from) params.set('from', from);
@@ -201,6 +202,15 @@ export default function MovementsPage() {
                 </select>
               </div>
               <div className="field">
+                <label>Referência</label>
+                <input
+                  className="input"
+                  placeholder="Ex.: MOV-..., cmm..."
+                  value={filters.reference}
+                  onChange={(e) => setFilters({ ...filters, reference: e.target.value })}
+                />
+              </div>
+              <div className="field">
                 <label>De</label>
                 <input
                   type="datetime-local"
@@ -227,7 +237,7 @@ export default function MovementsPage() {
                 type="button"
                 className="button"
                 onClick={() => {
-                  setFilters({ itemId: '', reason: '', from: '', to: '' });
+                  setFilters({ itemId: '', reason: '', reference: '', from: '', to: '' });
                   setSelectedMovementId(null);
                   setSelectedOrder(null);
                   setDetailError(null);

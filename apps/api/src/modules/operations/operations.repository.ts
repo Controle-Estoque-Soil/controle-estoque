@@ -125,6 +125,7 @@ export class OperationsRepository {
   listMovements(filters: {
     itemId?: string;
     reason?: 'MANUAL_ADJUSTMENT' | 'PRODUCT_INBOUND' | 'PRODUCT_OUTBOUND';
+    reference?: string;
     from?: Date;
     to?: Date;
   }) {
@@ -132,6 +133,12 @@ export class OperationsRepository {
       where: {
         itemId: filters.itemId,
         reason: filters.reason,
+        referenceId: filters.reference
+          ? {
+              contains: filters.reference,
+              mode: 'insensitive',
+            }
+          : undefined,
         createdAt:
           filters.from || filters.to
             ? {

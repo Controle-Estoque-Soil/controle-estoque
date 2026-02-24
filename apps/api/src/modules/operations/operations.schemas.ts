@@ -33,6 +33,7 @@ export type OperationListQuery = z.infer<typeof operationListQuerySchema>;
 export const movementListQuerySchema = z.object({
   itemId: z.string().optional(),
   reason: z.enum(['MANUAL_ADJUSTMENT', 'PRODUCT_INBOUND', 'PRODUCT_OUTBOUND']).optional(),
+  reference: z.string().trim().min(1).optional(),
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
 });

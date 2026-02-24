@@ -305,6 +305,7 @@ export class OperationsService {
     const movements = await this.operationsRepository.listMovements({
       itemId: query.itemId,
       reason: query.reason,
+      reference: query.reference?.trim() || undefined,
       from: dateRange.from,
       to: dateRange.to,
     });
