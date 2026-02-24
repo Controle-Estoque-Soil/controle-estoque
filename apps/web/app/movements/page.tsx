@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal, formatMovementReason } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatMovementReason, formatOperationType } from '@/lib/format';
 
 type ItemOption = { id: string; name: string; sku: string; unit: string };
 
@@ -393,7 +393,7 @@ export default function MovementsPage() {
               {selectedOrder ? (
                 <>
                   <p className="small">
-                    {selectedOrder.type} | {selectedOrder.product.name} ({selectedOrder.product.sku}) | qtd{' '}
+                    {formatOperationType(selectedOrder.type)} | {selectedOrder.product.name} ({selectedOrder.product.sku}) | qtd{' '}
                     {formatDecimal(selectedOrder.productQty)} | custo total {formatDecimal(selectedOrder.totalCost)} |{' '}
                     {formatDateTime(selectedOrder.createdAt)}
                   </p>

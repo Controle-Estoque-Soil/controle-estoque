@@ -39,3 +39,15 @@ export function formatMovementReason(
   return Number.isFinite(delta) && delta < 0 ? 'Saida de item' : 'Chegada de item';
 }
 
+export function formatOperationType(type: string): string {
+  if (type === 'OUTBOUND_PRODUCT') {
+    return 'Saida de produto';
+  }
+
+  if (type === 'INBOUND_PRODUCT') {
+    return 'Chegada de produto';
+  }
+
+  return type;
+}
+

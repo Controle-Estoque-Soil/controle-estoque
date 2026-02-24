@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatOperationType } from '@/lib/format';
 import { itemOperationFormSchema, operationFormSchema } from '@/lib/schemas';
 
 type ProductOption = { id: string; name: string; sku: string };
@@ -802,7 +802,7 @@ export default function OperationsPage() {
                     orders.map((order) => (
                       <tr key={order.id}>
                         <td>{formatDateTime(order.createdAt)}</td>
-                        <td>{order.type}</td>
+                        <td>{formatOperationType(order.type)}</td>
                         <td>{order.product.name}</td>
                         <td>{formatDecimal(order.productQty)}</td>
                         <td>{formatDecimal(order.totalCost)}</td>
@@ -823,7 +823,7 @@ export default function OperationsPage() {
                 <div className="separator" />
                 <h3>Detalhe da ordem selecionada</h3>
                 <p className="small">
-                  {selectedOrder.type} | {selectedOrder.product.name} | {formatDateTime(selectedOrder.createdAt)} | por{' '}
+                  {formatOperationType(selectedOrder.type)} | {selectedOrder.product.name} | {formatDateTime(selectedOrder.createdAt)} | por{' '}
                   {selectedOrder.createdByUser.email}
                 </p>
                 <div className="table-wrap">
