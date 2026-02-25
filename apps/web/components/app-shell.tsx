@@ -37,6 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { href: '/', label: 'Dashboard' },
     { href: '/items', label: 'Itens' },
     { href: '/products', label: 'Produtos' },
+    { href: '/intermediate-products', label: 'Produtos intermediarios' },
     { href: '/operations', label: 'Operações' },
     { href: '/movements', label: 'Movimentações' },
     ...(user?.role === 'ADMIN' ? [{ href: '/users', label: 'Controle de usuários' }] : []),

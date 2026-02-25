@@ -10,7 +10,7 @@ import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal, formatOperationType } from '@/lib/format';
 import { itemOperationFormSchema, operationFormSchema, productInboundSourceSchema } from '@/lib/schemas';
 
-type ProductOption = { id: string; name: string; sku: string };
+type ProductOption = { id: string; kind?: 'FINAL' | 'INTERMEDIATE'; name: string; sku: string };
 type ItemOption = {
   id: string;
   name: string;
@@ -23,7 +23,7 @@ type ItemOption = {
 
 type ProductOperationPreviewResponse = {
   type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
-  product: { id: string; name: string; sku: string };
+  product: { id: string; kind?: 'FINAL' | 'INTERMEDIATE'; name: string; sku: string };
   productQty: string;
   totalCost: string;
   unitCost: string;
@@ -76,7 +76,7 @@ type OrderListRecord = {
   unitCost: string;
   createdAt: string;
   note: string | null;
-  product: { id: string; name: string; sku: string };
+  product: { id: string; kind?: 'FINAL' | 'INTERMEDIATE'; name: string; sku: string };
   createdByUser: { id: string; name?: string | null; email: string; role: string };
   linesCount: number;
 };
@@ -90,7 +90,7 @@ type OrderDetailRecord = {
   unitCost: string;
   note: string | null;
   createdAt: string;
-  product: { id: string; name: string; sku: string };
+  product: { id: string; kind?: 'FINAL' | 'INTERMEDIATE'; name: string; sku: string };
   createdByUser: { id: string; name?: string | null; email: string; role: string };
   lines: Array<{
     id: string;
@@ -131,13 +131,14 @@ function buildSignedDelta(mode: 'outbound' | 'inbound', qty: string): string {
 export default function OperationsPage() {
   const { token, user } = useAuth();
   const [products, setProducts] = useState<ProductOption[]>([]);
+  const [intermediateProducts, setIntermediateProducts] = useState<ProductOption[]>([]);
   const [items, setItems] = useState<ItemOption[]>([]);
   const [orders, setOrders] = useState<OrderListRecord[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderDetailRecord | null>(null);
   const [orderDetailLoading, setOrderDetailLoading] = useState(false);
   const [orderDetailError, setOrderDetailError] = useState<string | null>(null);
   const [mode, setMode] = useState<'outbound' | 'inbound'>('outbound');
-  const [target, setTarget] = useState<'product' | 'item'>('product');
+  const [target, setTarget] = useState<'product' | 'intermediateProduct' | 'item'>('product');
   const [productForm, setProductForm] = useState({
     productId: '',
     qty: '',
@@ -195,6 +196,14 @@ export default function OperationsPage() {
     setProducts(response.data);
   }
 
+  async function loadIntermediateProducts() {
+    if (!token) {
+      return;
+    }
+    const response = await apiRequest<{ data: ProductOption[] }>('/intermediate-products', { token });
+    setIntermediateProducts(response.data);
+  }
+
   async function loadItems() {
     if (!token) {
       return;
@@ -239,7 +248,7 @@ export default function OperationsPage() {
     }
 
     setError(null);
-    Promise.all([loadProducts(), loadItems(), loadOrders()]).catch((caughtError) => {
+    Promise.all([loadProducts(), loadIntermediateProducts(), loadItems(), loadOrders()]).catch((caughtError) => {
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar dados de operacoes');
     });
   }, [token]);
@@ -319,7 +328,7 @@ export default function OperationsPage() {
     setRunningPreview(true);
 
     try {
-      if (target === 'product') {
+      if (isProductLikeTarget) {
         await handleProductPreview();
       } else {
         setItemPreview(buildItemPreview());
@@ -394,7 +403,7 @@ export default function OperationsPage() {
     setError(null);
     setSuccess(null);
     try {
-      if (target === 'product') {
+      if (isProductLikeTarget) {
         await executeProductOperation();
       } else {
         await executeItemOperation();
@@ -410,9 +419,12 @@ export default function OperationsPage() {
     }
   }
 
+  const isProductLikeTarget = target === 'product' || target === 'intermediateProduct';
   const selectedItemForForm = itemForm.itemId ? itemsById.get(itemForm.itemId) ?? null : null;
+  const productOptionsForTarget = target === 'intermediateProduct' ? intermediateProducts : products;
+  const productTargetLabel = target === 'intermediateProduct' ? 'Produto intermediario' : 'Produto';
   const canConfirm =
-    target === 'product'
+    isProductLikeTarget
       ? Boolean(productPreview && productPreview.canExecute && !submitting)
       : Boolean(itemPreview && itemPreview.canExecute && !submitting);
 
@@ -488,6 +500,20 @@ export default function OperationsPage() {
                   <button
                     type="button"
                     role="tab"
+                    aria-selected={target === 'intermediateProduct'}
+                    className={`segmented-button ${target === 'intermediateProduct' ? 'active' : ''}`}
+                    onClick={() => {
+                      setTarget('intermediateProduct');
+                      setError(null);
+                      setSuccess(null);
+                      setItemPreview(null);
+                    }}
+                  >
+                    Produto intermediario
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
                     aria-selected={target === 'item'}
                     className={`segmented-button ${target === 'item' ? 'active' : ''}`}
                     onClick={() => {
@@ -504,10 +530,10 @@ export default function OperationsPage() {
             </div>
 
             <div className="form-grid">
-              {target === 'product' ? (
+              {isProductLikeTarget ? (
                 <>
                   <div className="field">
-                    <label htmlFor="operation-product">Produto</label>
+                    <label htmlFor="operation-product">{productTargetLabel}</label>
                     <select
                       id="operation-product"
                       className="select"
@@ -515,7 +541,7 @@ export default function OperationsPage() {
                       onChange={(e) => setProductForm({ ...productForm, productId: e.target.value })}
                     >
                       <option value="">Selecione...</option>
-                      {products.map((product) => (
+                      {productOptionsForTarget.map((product) => (
                         <option key={product.id} value={product.id}>
                           {product.name} ({product.sku})
                         </option>
@@ -523,7 +549,9 @@ export default function OperationsPage() {
                     </select>
                   </div>
                   <div className="field">
-                    <label htmlFor="operation-product-qty">Quantidade de produtos</label>
+                    <label htmlFor="operation-product-qty">
+                      {target === 'intermediateProduct' ? 'Quantidade de produtos intermediarios' : 'Quantidade de produtos'}
+                    </label>
                     <input
                       id="operation-product-qty"
                       className="input"
@@ -600,9 +628,9 @@ export default function OperationsPage() {
                 <textarea
                   id="operation-note"
                   className="textarea"
-                  value={target === 'product' ? productForm.note : itemForm.note}
+                  value={isProductLikeTarget ? productForm.note : itemForm.note}
                   onChange={(e) =>
-                    target === 'product'
+                    isProductLikeTarget
                       ? setProductForm({ ...productForm, note: e.target.value })
                       : setItemForm({ ...itemForm, note: e.target.value })
                   }
@@ -614,9 +642,9 @@ export default function OperationsPage() {
                   <input
                     id="operation-override"
                     type="checkbox"
-                    checked={target === 'product' ? productForm.allowNegativeOverride : itemForm.allowNegativeOverride}
+                    checked={isProductLikeTarget ? productForm.allowNegativeOverride : itemForm.allowNegativeOverride}
                     onChange={(e) =>
-                      target === 'product'
+                      isProductLikeTarget
                         ? setProductForm({ ...productForm, allowNegativeOverride: e.target.checked })
                         : setItemForm({ ...itemForm, allowNegativeOverride: e.target.checked })
                     }
@@ -642,7 +670,7 @@ export default function OperationsPage() {
             <h2>Preview da operacao</h2>
             {!productPreview && !itemPreview ? (
               <p className="small">Preencha o formulario e gere o preview.</p>
-            ) : target === 'product' && productPreview ? (
+            ) : isProductLikeTarget && productPreview ? (
               <div className="grid">
                 <div className="grid three">
                   <div className="kpi-card">

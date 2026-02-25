@@ -11,51 +11,51 @@ import {
   productUpdateBodySchema,
 } from './products.schemas';
 
-export const productsRoutes: FastifyPluginAsync = async (fastify) => {
+export const intermediateProductsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
 
-  fastify.get('/products', async (request) => {
+  fastify.get('/intermediate-products', async (request) => {
     const query = parseWithSchema(productListQuerySchema, request.query);
     const service = new ProductsService(new ProductsRepository(fastify.prisma));
     return {
-      data: await service.list(query, 'FINAL'),
+      data: await service.list(query, 'INTERMEDIATE'),
     };
   });
 
-  fastify.get('/products/:id', async (request) => {
+  fastify.get('/intermediate-products/:id', async (request) => {
     const params = parseWithSchema(productIdParamsSchema, request.params);
     const service = new ProductsService(new ProductsRepository(fastify.prisma));
-    return service.getById(params.id, 'FINAL');
+    return service.getById(params.id, 'INTERMEDIATE');
   });
 
-  fastify.post('/products', async (request, reply) => {
+  fastify.post('/intermediate-products', async (request, reply) => {
     const body = parseWithSchema(productCreateBodySchema, request.body);
     const service = new ProductsService(new ProductsRepository(fastify.prisma));
-    const product = await service.create(body, 'FINAL');
+    const product = await service.create(body, 'INTERMEDIATE');
     return reply.status(201).send({ data: product });
   });
 
-  fastify.put('/products/:id', async (request) => {
+  fastify.put('/intermediate-products/:id', async (request) => {
     const params = parseWithSchema(productIdParamsSchema, request.params);
     const body = parseWithSchema(productUpdateBodySchema, request.body);
     const service = new ProductsService(new ProductsRepository(fastify.prisma));
     return {
-      data: await service.update(params.id, body, request.user, 'FINAL'),
+      data: await service.update(params.id, body, request.user, 'INTERMEDIATE'),
     };
   });
 
-  fastify.delete('/products/:id', async (request) => {
+  fastify.delete('/intermediate-products/:id', async (request) => {
     const params = parseWithSchema(productIdParamsSchema, request.params);
     const service = new ProductsService(new ProductsRepository(fastify.prisma));
     return {
-      data: await service.remove(params.id, 'FINAL'),
+      data: await service.remove(params.id, 'INTERMEDIATE'),
     };
   });
 
-  fastify.put('/products/:id/bom', async (request) => {
+  fastify.put('/intermediate-products/:id/bom', async (request) => {
     const params = parseWithSchema(productIdParamsSchema, request.params);
     const body = parseWithSchema(productBomReplaceBodySchema, request.body);
     const service = new ProductsService(new ProductsRepository(fastify.prisma));
-    return service.replaceBom(params.id, body, 'FINAL');
+    return service.replaceBom(params.id, body, 'INTERMEDIATE');
   });
 };

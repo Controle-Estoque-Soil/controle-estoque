@@ -20,14 +20,15 @@ function buildOrderDetail() {
     createdAt: new Date('2026-02-23T00:00:00Z'),
     product: {
       id: 'prod_1',
+      kind: 'FINAL' as const,
       name: 'Produto Final',
       sku: 'PROD-1',
-      active: true,
       createdAt: new Date('2026-02-23T00:00:00Z'),
       updatedAt: new Date('2026-02-23T00:00:00Z'),
     },
     createdByUser: {
       id: 'user_1',
+      name: 'Admin',
       email: 'admin@example.com',
       passwordHash: 'hash',
       role: 'ADMIN' as const,
@@ -61,9 +62,9 @@ function buildOrderDetail() {
 function buildRepositoryMock(options?: { insufficientStock?: boolean; failOnLines?: boolean }) {
   const product = {
     id: 'prod_1',
+    kind: 'FINAL' as const,
     name: 'Produto Final',
     sku: 'PROD-1',
-    active: true,
     createdAt: new Date('2026-02-23T00:00:00Z'),
     updatedAt: new Date('2026-02-23T00:00:00Z'),
     bomItems: [
@@ -104,6 +105,7 @@ function buildRepositoryMock(options?: { insufficientStock?: boolean; failOnLine
         },
       },
     ],
+    bomIntermediateProducts: [],
   };
 
   const items = [

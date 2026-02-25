@@ -32,6 +32,14 @@ type Shortage = {
   availableQty: Prisma.Decimal;
 };
 
+type FlattenedBomLine = {
+  itemId: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+  itemQtyRequiredPerProduct: Prisma.Decimal;
+};
+
 function ensurePositiveQty(qty: Prisma.Decimal): void {
   if (!qty.gt(0)) {
     throw appErrors.badRequest('qty must be greater than zero');
@@ -50,6 +58,7 @@ function serializeOrderDetail(order: OrderDetailRecord) {
     createdAt: order.createdAt.toISOString(),
     product: {
       id: order.product.id,
+      kind: order.product.kind,
       name: order.product.name,
       sku: order.product.sku,
     },
@@ -72,6 +81,59 @@ function serializeOrderDetail(order: OrderDetailRecord) {
         unit: line.item.unit,
       },
     })),
+  };
+}
+
+function flattenProductBomForOperation(product: NonNullable<ProductWithBom>) {
+  const aggregated = new Map<string, FlattenedBomLine>();
+  const bomNotes: string[] = [];
+
+  for (const line of product.bomItems) {
+    const existing = aggregated.get(line.itemId);
+    if (existing) {
+      existing.itemQtyRequiredPerProduct = existing.itemQtyRequiredPerProduct.add(line.qtyRequired);
+      continue;
+    }
+    aggregated.set(line.itemId, {
+      itemId: line.itemId,
+      itemName: line.item.name,
+      itemSku: line.item.sku,
+      itemUnit: line.item.unit,
+      itemQtyRequiredPerProduct: line.qtyRequired,
+    });
+  }
+
+  for (const intermediateLine of product.bomIntermediateProducts) {
+    const intermediate = intermediateLine.intermediateProduct;
+    if (intermediate.kind !== 'INTERMEDIATE') {
+      bomNotes.push(`Componente invalido na BOM: ${intermediate.name} nao e produto intermediario.`);
+      continue;
+    }
+    if (intermediate.bomItems.length === 0) {
+      bomNotes.push(`Produto intermediario "${intermediate.name}" sem BOM cadastrada.`);
+      continue;
+    }
+
+    for (const nestedLine of intermediate.bomItems) {
+      const effectiveQty = intermediateLine.qtyRequired.mul(nestedLine.qtyRequired);
+      const existing = aggregated.get(nestedLine.itemId);
+      if (existing) {
+        existing.itemQtyRequiredPerProduct = existing.itemQtyRequiredPerProduct.add(effectiveQty);
+        continue;
+      }
+      aggregated.set(nestedLine.itemId, {
+        itemId: nestedLine.itemId,
+        itemName: nestedLine.item.name,
+        itemSku: nestedLine.item.sku,
+        itemUnit: nestedLine.item.unit,
+        itemQtyRequiredPerProduct: effectiveQty,
+      });
+    }
+  }
+
+  return {
+    lines: Array.from(aggregated.values()).sort((a, b) => a.itemName.localeCompare(b.itemName, 'pt-BR')),
+    notes: bomNotes,
   };
 }
 
@@ -136,11 +198,19 @@ export class OperationsService {
       throw appErrors.notFound('Product not found');
     }
 
-    if (product.bomItems.length === 0) {
+    if (product.bomItems.length === 0 && product.bomIntermediateProducts.length === 0) {
       throw appErrors.badRequest('Product BOM is empty');
     }
 
-    const itemIds = product.bomItems.map((bomItem) => bomItem.itemId).sort();
+    const flattenedBom = flattenProductBomForOperation(product);
+    if (flattenedBom.notes.length > 0) {
+      throw appErrors.badRequest(flattenedBom.notes[0] ?? 'Product BOM is invalid');
+    }
+    if (flattenedBom.lines.length === 0) {
+      throw appErrors.badRequest('Product BOM is empty');
+    }
+
+    const itemIds = flattenedBom.lines.map((line) => line.itemId).sort();
     if (tx) {
       await this.operationsRepository.lockItems(itemIds, tx);
     }
@@ -155,13 +225,13 @@ export class OperationsService {
     let totalCost = new Prisma.Decimal(0);
     const shortages: Shortage[] = [];
 
-    const lines: PlannedLine[] = product.bomItems.map((bomItem) => {
-      const currentItem = currentItemsMap.get(bomItem.itemId);
+    const lines: PlannedLine[] = flattenedBom.lines.map((bomLine) => {
+      const currentItem = currentItemsMap.get(bomLine.itemId);
       if (!currentItem) {
         throw appErrors.badRequest('Product BOM references missing item(s)');
       }
 
-      const itemQty = bomItem.qtyRequired.mul(productQty);
+      const itemQty = bomLine.itemQtyRequiredPerProduct.mul(productQty);
       const lineCost = itemQty.mul(currentItem.unitPrice);
       totalCost = totalCost.add(lineCost);
 
@@ -207,6 +277,7 @@ export class OperationsService {
       type,
       product: {
         id: plan.product.id,
+        kind: plan.product.kind,
         name: plan.product.name,
         sku: plan.product.sku,
       },
@@ -487,6 +558,7 @@ export class OperationsService {
       reversalOrderId: reversalOrder.id,
       product: {
         id: order.product.id,
+        kind: order.product.kind,
         name: order.product.name,
         sku: order.product.sku,
       },
@@ -514,6 +586,7 @@ export class OperationsService {
       note: order.note,
       product: {
         id: order.product.id,
+        kind: order.product.kind,
         name: order.product.name,
         sku: order.product.sku,
       },
@@ -586,6 +659,7 @@ export class OperationsService {
                 reversalOrderId: reversalOrder?.id ?? null,
                 product: {
                   id: order.product.id,
+                  kind: order.product.kind,
                   name: order.product.name,
                   sku: order.product.sku,
                 },

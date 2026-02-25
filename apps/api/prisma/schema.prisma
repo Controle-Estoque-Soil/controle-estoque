@@ -17,6 +17,11 @@ enum OperationType {
   OUTBOUND_PRODUCT
 }
 
+enum ProductKind {
+  FINAL
+  INTERMEDIATE
+}
+
 enum StockMovementReason {
   MANUAL_ADJUSTMENT
   PRODUCT_INBOUND
@@ -62,6 +67,7 @@ model Item {
 
 model Product {
   id           String           @id @default(cuid())
+  kind         ProductKind      @default(FINAL)
   name         String
   sku          String           @unique
   manufacturingLeadTimeDays String?  @db.Text @map("manufacturing_lead_time_days")
@@ -70,8 +76,11 @@ model Product {
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
   bomItems     ProductBomItem[]
+  bomIntermediateProducts ProductBomIntermediateProduct[] @relation("product_bom_intermediate_parent")
+  usedAsIntermediateIn ProductBomIntermediateProduct[]    @relation("product_bom_intermediate_child")
   orders       ProductOrder[]
 
+  @@index([kind])
   @@index([name])
   @@map("products")
 }
@@ -87,6 +96,19 @@ model ProductBomItem {
   @@unique([productId, itemId])
   @@index([itemId])
   @@map("product_bom_items")
+}
+
+model ProductBomIntermediateProduct {
+  id                  String  @id @default(cuid())
+  productId           String  @map("product_id")
+  intermediateProductId String @map("intermediate_product_id")
+  qtyRequired         Decimal @db.Decimal(18, 6) @map("qty_required")
+  product             Product @relation("product_bom_intermediate_parent", fields: [productId], references: [id], onDelete: Cascade)
+  intermediateProduct Product @relation("product_bom_intermediate_child", fields: [intermediateProductId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, intermediateProductId])
+  @@index([intermediateProductId])
+  @@map("product_bom_intermediate_products")
 }
 
 model StockMovement {

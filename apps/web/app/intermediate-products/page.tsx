@@ -120,7 +120,8 @@ const intermediateBomLineSchema = z.object({
   }),
 });
 
-export default function ProductsPage() {
+export default function IntermediateProductsPage() {
+  const allowIntermediateComponents = false;
   const { token } = useAuth();
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [items, setItems] = useState<ItemOption[]>([]);
@@ -157,7 +158,7 @@ export default function ProductsPage() {
     setError(null);
     try {
       const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
-      const response = await apiRequest<{ data: ProductRecord[] }>(`/products${query}`, { token });
+      const response = await apiRequest<{ data: ProductRecord[] }>(`/intermediate-products${query}`, { token });
       setProducts(response.data);
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar produtos');
@@ -196,7 +197,7 @@ export default function ProductsPage() {
     }
     setError(null);
     try {
-      const response = await apiRequest<ProductDetailResponse>(`/products/${id}`, { token });
+      const response = await apiRequest<ProductDetailResponse>(`/intermediate-products/${id}`, { token });
       setSelectedProductId(id);
       setDetail(response);
       setEditForm({
@@ -208,10 +209,12 @@ export default function ProductsPage() {
       });
       setBomLines(response.bom.map((line) => ({ itemId: line.itemId, qtyRequired: line.qtyRequired })));
       setIntermediateBomLines(
-        (response.intermediateBom ?? []).map((line) => ({
-          intermediateProductId: line.intermediateProductId,
-          qtyRequired: line.qtyRequired,
-        })),
+        allowIntermediateComponents
+          ? (response.intermediateBom ?? []).map((line) => ({
+              intermediateProductId: line.intermediateProductId,
+              qtyRequired: line.qtyRequired,
+            }))
+          : [],
       );
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar produto');
@@ -235,7 +238,7 @@ export default function ProductsPage() {
     setSuccess(null);
     try {
       const payload = productFormSchema.parse(createForm);
-      await apiRequest<{ data: ProductRecord }>('/products', {
+      await apiRequest<{ data: ProductRecord }>('/intermediate-products', {
         method: 'POST',
         token,
         body: {
@@ -244,7 +247,7 @@ export default function ProductsPage() {
         },
       });
       setCreateForm(emptyProductForm());
-      setSuccess('Produto criado com sucesso.');
+      setSuccess('Produto intermediario criado com sucesso.');
       await loadProducts();
     } catch (caughtError) {
       if (caughtError instanceof z.ZodError) {
@@ -268,7 +271,7 @@ export default function ProductsPage() {
     setSuccess(null);
     try {
       const payload = productFormSchema.parse(editForm);
-      await apiRequest<{ data: ProductRecord }>(`/products/${selectedProductId}`, {
+      await apiRequest<{ data: ProductRecord }>(`/intermediate-products/${selectedProductId}`, {
         method: 'PUT',
         token,
         body: {
@@ -277,7 +280,7 @@ export default function ProductsPage() {
             payload.manufacturingLeadTimeDays === '' ? null : payload.manufacturingLeadTimeDays,
         },
       });
-      setSuccess('Produto atualizado com sucesso.');
+      setSuccess('Produto intermediario atualizado com sucesso.');
       await loadProducts();
       await loadDetail(selectedProductId);
     } catch (caughtError) {
@@ -299,8 +302,8 @@ export default function ProductsPage() {
     setError(null);
     setSuccess(null);
     try {
-      await apiRequest<{ data: ProductRecord }>(`/products/${id}`, { method: 'DELETE', token });
-      setSuccess('Produto removido.');
+      await apiRequest<{ data: ProductRecord }>(`/intermediate-products/${id}`, { method: 'DELETE', token });
+      setSuccess('Produto intermediario removido.');
       if (selectedProductId === id) {
         setSelectedProductId(null);
         setDetail(null);
@@ -382,7 +385,7 @@ export default function ProductsPage() {
           id: operation.id,
           date: new Date(operation.createdAt).toLocaleString('pt-BR'),
           reference: operation.id,
-          originText: parsed.sourceText ?? 'Produto',
+          originText: parsed.sourceText ?? 'Produto intermediario',
           originAsBadge: !parsed.sourceText,
           originBadgeTone: !parsed.sourceText ? 'ok' : undefined,
           delta: `${deltaSign}${formatDecimal(operation.productQty)} un`,
@@ -450,10 +453,10 @@ export default function ProductsPage() {
     try {
       const parsedLines = bomLines.map((line) => bomLineSchema.parse(line));
       const parsedIntermediateLines = intermediateBomLines.map((line) => intermediateBomLineSchema.parse(line));
-      await apiRequest<ProductDetailResponse>(`/products/${selectedProductId}/bom`, {
+      await apiRequest<ProductDetailResponse>(`/intermediate-products/${selectedProductId}/bom`, {
         method: 'PUT',
         token,
-        body: { items: parsedLines, intermediateProducts: parsedIntermediateLines },
+        body: { items: parsedLines, intermediateProducts: allowIntermediateComponents ? parsedIntermediateLines : [] },
       });
       setSuccess('BOM salva com sucesso.');
       await loadProducts();
@@ -483,8 +486,8 @@ export default function ProductsPage() {
         <section className="panel">
           <div className="page-header">
             <div>
-              <h1 className="page-title">Produtos finais</h1>
-              <p className="page-subtitle">Cadastro de produtos e edição da receita/BOM.</p>
+              <h1 className="page-title">Produtos intermediarios</h1>
+              <p className="page-subtitle">Cadastro de produtos intermediarios e edicao da receita/BOM (somente itens).</p>
             </div>
             <div className="actions">
               <input
@@ -575,7 +578,7 @@ export default function ProductsPage() {
 
         <section className="grid two">
           <div className="panel">
-            <h2>Criar produto</h2>
+            <h2>Criar produto intermediario</h2>
             <form className="form-grid" onSubmit={handleCreate}>
               <div className="field">
                 <label htmlFor="create-product-name">Nome</label>
@@ -635,7 +638,7 @@ export default function ProductsPage() {
           </div>
 
           <div className="panel">
-            <h2>Editar produto / BOM</h2>
+            <h2>Editar produto intermediario / BOM</h2>
             {!selectedProductId || !detail ? (
               <p className="small">Selecione um produto para editar os dados e a BOM.</p>
             ) : (
@@ -705,12 +708,14 @@ export default function ProductsPage() {
                     <button type="button" className="button ghost" onClick={addBomLine}>
                       Adicionar item
                     </button>
-                    <button type="button" className="button ghost" onClick={addIntermediateBomLine}>
-                      Adicionar produto intermediario
-                    </button>
+                    {allowIntermediateComponents ? (
+                      <button type="button" className="button ghost" onClick={addIntermediateBomLine}>
+                        Adicionar produto intermediario
+                      </button>
+                    ) : null}
                   </div>
-                  {bomLines.length === 0 && intermediateBomLines.length === 0 ? (
-                    <p className="small">BOM vazia. Adicione itens e/ou produtos intermediarios.</p>
+                  {bomLines.length === 0 && (!allowIntermediateComponents || intermediateBomLines.length === 0) ? (
+                    <p className="small">BOM vazia. Adicione itens e quantidades.</p>
                   ) : null}
                   {bomLines.length > 0 ? <h4 style={{ margin: 0 }}>Itens da BOM</h4> : null}
                   {bomLines.map((line, index) => (
@@ -760,8 +765,10 @@ export default function ProductsPage() {
                       </div>
                     </div>
                   ))}
-                  {intermediateBomLines.length > 0 ? <h4 style={{ margin: 0 }}>Produtos intermediarios da BOM</h4> : null}
-                  {intermediateBomLines.map((line, index) => (
+                  {allowIntermediateComponents && intermediateBomLines.length > 0 ? (
+                    <h4 style={{ margin: 0 }}>Produtos intermediarios da BOM</h4>
+                  ) : null}
+                  {allowIntermediateComponents ? intermediateBomLines.map((line, index) => (
                     <div key={`${line.intermediateProductId}-${index}`} className="form-grid panel">
                       <div className="field full">
                         <label>Produto intermediario</label>
@@ -811,7 +818,7 @@ export default function ProductsPage() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                  )) : null}
                   <div className="actions">
                     <button type="submit" className="button" disabled={saving || !selectedProductId}>
                       {saving ? 'Salvando...' : 'Salvar BOM'}
@@ -819,7 +826,7 @@ export default function ProductsPage() {
                   </div>
                 </form>
 
-                {detail.bom.length > 0 || (detail.intermediateBom?.length ?? 0) > 0 ? (
+                {detail.bom.length > 0 || (allowIntermediateComponents && (detail.intermediateBom?.length ?? 0) > 0) ? (
                   <div>
                     <h3>BOM atual</h3>
                     {detail.bom.length > 0 ? (
@@ -848,7 +855,7 @@ export default function ProductsPage() {
                       </table>
                     </div>
                     ) : null}
-                    {(detail.intermediateBom?.length ?? 0) > 0 ? (
+                    {allowIntermediateComponents && (detail.intermediateBom?.length ?? 0) > 0 ? (
                       <div className="table-wrap" style={{ marginTop: '0.75rem' }}>
                         <table className="table">
                           <thead>
@@ -882,7 +889,7 @@ export default function ProductsPage() {
         <DeleteActionDialog
           open={deleteDialog != null}
           busy={saving}
-          title="Deletar produto"
+          title="Deletar produto intermediario"
           entityName={deleteDialog ? `${deleteDialog.product.name} (${deleteDialog.product.sku})` : ''}
           quantityLabel="Quantidade de produtos para remover"
           quantityUnit="un"
@@ -907,12 +914,12 @@ export default function ProductsPage() {
         />
         <MovementSummaryModal
           open={movementDialogProduct != null}
-          title="Movimentacoes do produto"
+          title="Movimentacoes do produto intermediario"
           subtitle={movementDialogProduct ? `${movementDialogProduct.name} (${movementDialogProduct.sku})` : null}
           loading={movementDialogLoading}
           error={movementDialogError}
           rows={movementDialogRows}
-          emptyMessage="Nenhuma movimentacao de produto encontrada."
+          emptyMessage="Nenhuma movimentacao de produto intermediario encontrada."
           onClose={closeProductMovementsDialog}
         />
         {capacityDialogProduct ? (
@@ -927,7 +934,7 @@ export default function ProductsPage() {
             >
               <div className="modal-header">
                 <div>
-                  <h3 id="capacity-dialog-title">Capacidade de producao</h3>
+                  <h3 id="capacity-dialog-title">Capacidade de producao (produto intermediario)</h3>
                   <p className="small" style={{ margin: 0 }}>
                     {capacityDialogProduct.name} ({capacityDialogProduct.sku})
                   </p>
@@ -1005,4 +1012,5 @@ export default function ProductsPage() {
     </RequireAuth>
   );
 }
+
 

@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient, type ProductKind } from '@prisma/client';
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -9,9 +9,10 @@ export class ProductsRepository {
     return this.prisma.$transaction((tx) => callback(tx));
   }
 
-  list(filters: { search?: string }) {
+  list(filters: { search?: string; kind?: ProductKind }) {
     return this.prisma.product.findMany({
       where: {
+        kind: filters.kind,
         ...(filters.search
           ? {
               OR: [
@@ -24,7 +25,7 @@ export class ProductsRepository {
       orderBy: [{ name: 'asc' }],
       include: {
         _count: {
-          select: { bomItems: true },
+          select: { bomItems: true, bomIntermediateProducts: true },
         },
         bomItems: {
           include: {
@@ -39,6 +40,29 @@ export class ProductsRepository {
             },
           },
           orderBy: [{ item: { name: 'asc' } }],
+        },
+        bomIntermediateProducts: {
+          include: {
+            intermediateProduct: {
+              include: {
+                bomItems: {
+                  include: {
+                    item: {
+                      select: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        unit: true,
+                        qtyOnHand: true,
+                      },
+                    },
+                  },
+                  orderBy: [{ item: { name: 'asc' } }],
+                },
+              },
+            },
+          },
+          orderBy: [{ intermediateProduct: { name: 'asc' } }],
         },
       },
     });
@@ -60,12 +84,28 @@ export class ProductsRepository {
             item: true,
           },
         },
+        bomIntermediateProducts: {
+          orderBy: [{ intermediateProduct: { name: 'asc' } }],
+          include: {
+            intermediateProduct: {
+              include: {
+                bomItems: {
+                  include: {
+                    item: true,
+                  },
+                  orderBy: [{ item: { name: 'asc' } }],
+                },
+              },
+            },
+          },
+        },
       },
     });
   }
 
   create(
     data: {
+      kind: ProductKind;
       name: string;
       sku: string;
       manufacturingLeadTimeDays?: string | null;
@@ -110,12 +150,28 @@ export class ProductsRepository {
     });
   }
 
+  getProductsByIds(productIds: string[], db: DbClient = this.prisma) {
+    if (productIds.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return db.product.findMany({
+      where: {
+        id: { in: productIds },
+      },
+    });
+  }
+
   async replaceBom(
     productId: string,
     lines: Array<{ itemId: string; qtyRequired: Prisma.Decimal }>,
+    intermediateLines: Array<{ intermediateProductId: string; qtyRequired: Prisma.Decimal }>,
     db: DbClient = this.prisma,
   ): Promise<void> {
     await db.productBomItem.deleteMany({
+      where: { productId },
+    });
+    await db.productBomIntermediateProduct.deleteMany({
       where: { productId },
     });
 
@@ -124,6 +180,16 @@ export class ProductsRepository {
         data: lines.map((line) => ({
           productId,
           itemId: line.itemId,
+          qtyRequired: line.qtyRequired,
+        })),
+      });
+    }
+
+    if (intermediateLines.length > 0) {
+      await db.productBomIntermediateProduct.createMany({
+        data: intermediateLines.map((line) => ({
+          productId,
+          intermediateProductId: line.intermediateProductId,
           qtyRequired: line.qtyRequired,
         })),
       });

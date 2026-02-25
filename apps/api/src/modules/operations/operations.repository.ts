@@ -21,6 +21,21 @@ export class OperationsRepository {
           },
           orderBy: [{ item: { name: 'asc' } }],
         },
+        bomIntermediateProducts: {
+          include: {
+            intermediateProduct: {
+              include: {
+                bomItems: {
+                  include: {
+                    item: true,
+                  },
+                  orderBy: [{ item: { name: 'asc' } }],
+                },
+              },
+            },
+          },
+          orderBy: [{ intermediateProduct: { name: 'asc' } }],
+        },
       },
     });
   }

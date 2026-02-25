@@ -39,19 +39,32 @@ export type ProductUpdateBody = z.infer<typeof productUpdateBodySchema>;
 
 export const productListQuerySchema = z.object({
   search: z.string().trim().optional(),
+  kind: z.enum(['FINAL', 'INTERMEDIATE']).optional(),
 });
 
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;
 
 export const productBomReplaceBodySchema = z.object({
-  items: z.array(
-    z.object({
-      itemId: z.string().min(1),
-      qtyRequired: nonNegativeDecimalStringSchema.refine((value) => !/^0(?:\.0+)?$/.test(value), {
-        message: 'qtyRequired must be greater than zero',
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        qtyRequired: nonNegativeDecimalStringSchema.refine((value) => !/^0(?:\.0+)?$/.test(value), {
+          message: 'qtyRequired must be greater than zero',
+        }),
       }),
-    }),
-  ),
+    )
+    .default([]),
+  intermediateProducts: z
+    .array(
+      z.object({
+        intermediateProductId: z.string().min(1),
+        qtyRequired: nonNegativeDecimalStringSchema.refine((value) => !/^0(?:\.0+)?$/.test(value), {
+          message: 'qtyRequired must be greater than zero',
+        }),
+      }),
+    )
+    .optional(),
 });
 
 export type ProductBomReplaceBody = z.infer<typeof productBomReplaceBodySchema>;

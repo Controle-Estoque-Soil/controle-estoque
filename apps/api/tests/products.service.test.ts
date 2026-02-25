@@ -16,9 +16,9 @@ function buildRepositoryMock() {
         product: {
           findUnique: vi.fn(async () => ({
             id: 'prod_1',
+            kind: 'FINAL' as const,
             name: 'Produto',
             sku: 'PROD-1',
-            active: true,
             createdAt: new Date('2026-02-23T00:00:00Z'),
             updatedAt: new Date('2026-02-23T00:00:00Z'),
           })),
@@ -30,17 +30,17 @@ function buildRepositoryMock() {
     list: vi.fn(),
     getById: vi.fn(async () => ({
       id: 'prod_1',
+      kind: 'FINAL' as const,
       name: 'Produto',
       sku: 'PROD-1',
-      active: true,
       createdAt: new Date('2026-02-23T00:00:00Z'),
       updatedAt: new Date('2026-02-23T00:00:00Z'),
     })),
     getByIdWithBom: vi.fn(async () => ({
       id: 'prod_1',
+      kind: 'FINAL' as const,
       name: 'Produto',
       sku: 'PROD-1',
-      active: true,
       createdAt: new Date('2026-02-23T00:00:00Z'),
       updatedAt: new Date('2026-02-23T00:00:00Z'),
       bomItems: [
@@ -57,17 +57,18 @@ function buildRepositoryMock() {
             unitPrice: decimal('10'),
             qtyOnHand: decimal('100'),
             minQty: decimal('10'),
-            active: true,
             createdAt: new Date('2026-02-23T00:00:00Z'),
             updatedAt: new Date('2026-02-23T00:00:00Z'),
           },
         },
       ],
+      bomIntermediateProducts: [],
     })),
     create: vi.fn(),
     update: vi.fn(),
-    softDelete: vi.fn(),
+    delete: vi.fn(),
     countItemsByIds: vi.fn(async (itemIds: string[]) => itemIds.length),
+    getProductsByIds: vi.fn(async () => []),
     replaceBom: vi.fn(async () => undefined),
   };
 }
