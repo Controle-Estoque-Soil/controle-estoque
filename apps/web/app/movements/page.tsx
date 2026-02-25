@@ -469,7 +469,7 @@ export default function MovementsPage() {
                         <td>{movement.createdByUser.email}</td>
                         <td>
                           {parsedNote.displayNote ?? '-'}
-                          {isStandaloneItemMovement(movement) ? (
+                          {isStandaloneItemMovement(movement) && parsedNote.displayNote ? (
                             <div className="small" style={{ color: '#166534' }}>Saida/entrada de item fora de produto</div>
                           ) : null}
                         </td>
