@@ -16,6 +16,10 @@ type MovementRecord = {
   reason: string;
   referenceType: string;
   referenceId: string | null;
+  reversalOfMovementId: string | null;
+  isReversal: boolean;
+  isUndone: boolean;
+  reversalMovementId: string | null;
   note: string | null;
   createdAt: string;
   item: { id: string; name: string; sku: string; unit: string };
@@ -24,6 +28,10 @@ type MovementRecord = {
     id: string;
     type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
     productQty: string;
+    reversalOfOrderId: string | null;
+    isReversal: boolean;
+    isUndone: boolean;
+    reversalOrderId: string | null;
     product: { id: string; name: string; sku: string };
   };
 };
@@ -95,7 +103,7 @@ function movementSourceLabel(movement: MovementRecord): string {
 }
 
 export default function MovementsPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [items, setItems] = useState<ItemOption[]>([]);
   const [movements, setMovements] = useState<MovementRecord[]>([]);
   const [filters, setFilters] = useState({ itemId: '', reason: '', reference: '', from: '', to: '' });
@@ -105,6 +113,7 @@ export default function MovementsPage() {
   const [selectedOrder, setSelectedOrder] = useState<OrderDetailRecord | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [undoingKey, setUndoingKey] = useState<string | null>(null);
 
   const displayRows = useMemo<MovementDisplayRow[]>(() => {
     const rows: MovementDisplayRow[] = [];
@@ -196,6 +205,47 @@ export default function MovementsPage() {
       setDetailError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar itens da operacao');
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  async function handleUndoMovement(row: MovementDisplayRow) {
+    if (!token) {
+      return;
+    }
+
+    const movement = row.movement;
+    const label =
+      row.rowType === 'product' && movement.productOrder
+        ? `${movement.productOrder.product.name} (${formatDecimal(movement.productOrder.productQty)} un)`
+        : `${movement.item.name} (${formatDecimal(movement.deltaQty)} ${movement.item.unit})`;
+
+    const confirmed = window.confirm(
+      `Desfazer esta movimentacao?\n\n${label}\n\nIsso vai criar uma reversao de auditoria e ajustar o estoque.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setUndoingKey(row.key);
+    setError(null);
+    setDetailError(null);
+
+    try {
+      await apiRequest(`/movements/${movement.id}/undo`, {
+        method: 'POST',
+        token,
+      });
+
+      if (selectedMovementId === movement.id) {
+        setSelectedMovementId(null);
+        setSelectedOrder(null);
+      }
+
+      await loadMovements();
+    } catch (caughtError) {
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao desfazer movimentacao');
+    } finally {
+      setUndoingKey(null);
     }
   }
 
@@ -297,22 +347,26 @@ export default function MovementsPage() {
                   <th>Nota</th>
                   <th>Origem</th>
                   <th>Detalhe</th>
+                  <th>Desfazer</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9}>Carregando...</td>
+                    <td colSpan={10}>Carregando...</td>
                   </tr>
                 ) : displayRows.length === 0 ? (
                   <tr>
-                    <td colSpan={9}>Nenhuma movimentacao encontrada.</td>
+                    <td colSpan={10}>Nenhuma movimentacao encontrada.</td>
                   </tr>
                 ) : (
                   displayRows.map((row) => {
                     const movement = row.movement;
                     const isOrderMovement = canOpenOrderDetail(movement);
                     const isProductRow = row.rowType === 'product' && movement.productOrder != null;
+                    const isReversalRow = isProductRow ? Boolean(movement.productOrder?.isReversal) : Boolean(movement.isReversal);
+                    const isAlreadyUndone = isProductRow ? Boolean(movement.productOrder?.isUndone) : Boolean(movement.isUndone);
+                    const canUndo = user?.role === 'ADMIN' && !isReversalRow && !isAlreadyUndone;
                     return (
                       <tr
                         key={row.key}
@@ -371,6 +425,27 @@ export default function MovementsPage() {
                               }}
                             >
                               Ver itens
+                            </button>
+                          ) : (
+                            <span className="small">-</span>
+                          )}
+                        </td>
+                        <td>
+                          {isReversalRow ? (
+                            <span className="small">Reversao</span>
+                          ) : isAlreadyUndone ? (
+                            <span className="small" style={{ color: '#166534', fontWeight: 600 }}>Desfeito</span>
+                          ) : canUndo ? (
+                            <button
+                              type="button"
+                              className="button ghost compact"
+                              disabled={undoingKey === row.key}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleUndoMovement(row);
+                              }}
+                            >
+                              {undoingKey === row.key ? 'Desfazendo...' : 'Desfazer'}
                             </button>
                           ) : (
                             <span className="small">-</span>

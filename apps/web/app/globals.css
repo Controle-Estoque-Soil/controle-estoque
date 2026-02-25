@@ -262,6 +262,13 @@ a {
   border-color: var(--line);
 }
 
+.button.compact {
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.65rem;
+  font-size: 0.9rem;
+  line-height: 1.1;
+}
+
 .button.ghost.active-pill {
   background: rgba(21, 128, 61, 0.08);
   border-color: rgba(21, 128, 61, 0.24);

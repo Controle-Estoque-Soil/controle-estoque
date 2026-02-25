@@ -29,6 +29,10 @@ export class OperationsRepository {
     return db.$queryRaw`SELECT id FROM "items" WHERE id IN (${Prisma.join(itemIds)}) FOR UPDATE`;
   }
 
+  lockProduct(productId: string, db: Prisma.TransactionClient) {
+    return db.$queryRaw`SELECT id FROM "products" WHERE id = ${productId} FOR UPDATE`;
+  }
+
   getItemsByIds(itemIds: string[], db: DbClient = this.prisma) {
     return db.item.findMany({
       where: {
@@ -41,6 +45,26 @@ export class OperationsRepository {
     return db.item.update({
       where: { id },
       data: { qtyOnHand },
+    });
+  }
+
+  getProductById(id: string, db: DbClient = this.prisma) {
+    return db.product.findUnique({
+      where: { id },
+    });
+  }
+
+  updateProductQtyCounters(
+    id: string,
+    data: {
+      qtyInStock?: Prisma.Decimal;
+      qtySoldTotal?: Prisma.Decimal;
+    },
+    db: DbClient = this.prisma,
+  ) {
+    return db.product.update({
+      where: { id },
+      data,
     });
   }
 
@@ -63,6 +87,7 @@ export class OperationsRepository {
       totalCost: Prisma.Decimal;
       unitCost: Prisma.Decimal;
       note?: string | null;
+      reversalOfOrderId?: string | null;
       createdByUserId: string;
     },
     db: DbClient = this.prisma,
@@ -75,6 +100,7 @@ export class OperationsRepository {
         totalCost: data.totalCost,
         unitCost: data.unitCost,
         note: data.note ?? null,
+        reversalOfOrderId: data.reversalOfOrderId ?? null,
         createdByUserId: data.createdByUserId,
       },
     });
@@ -112,6 +138,7 @@ export class OperationsRepository {
       reason: 'PRODUCT_INBOUND' | 'PRODUCT_OUTBOUND';
       referenceId: string;
       note?: string | null;
+      reversalOfMovementId?: string | null;
       createdByUserId: string;
     }>,
     db: DbClient = this.prisma,
@@ -127,6 +154,7 @@ export class OperationsRepository {
         reason: movement.reason,
         referenceType: 'PRODUCT_ORDER',
         referenceId: movement.referenceId,
+        reversalOfMovementId: movement.reversalOfMovementId ?? null,
         note: movement.note ?? null,
         createdByUserId: movement.createdByUserId,
       })),
@@ -164,6 +192,44 @@ export class OperationsRepository {
         createdByUser: true,
       },
       take: 200,
+    });
+  }
+
+  getMovementById(id: string, db: DbClient = this.prisma) {
+    return db.stockMovement.findUnique({
+      where: { id },
+      include: {
+        item: true,
+        createdByUser: true,
+      },
+    });
+  }
+
+  getMovementReversalByOriginalId(reversalOfMovementId: string, db: DbClient = this.prisma) {
+    return db.stockMovement.findFirst({
+      where: { reversalOfMovementId },
+      include: {
+        item: true,
+        createdByUser: true,
+      },
+    });
+  }
+
+  getMovementReversalsByOriginalIds(ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this.prisma.stockMovement.findMany({
+      where: {
+        reversalOfMovementId: {
+          in: ids,
+        },
+      },
+      include: {
+        item: true,
+        createdByUser: true,
+      },
     });
   }
 
@@ -212,6 +278,34 @@ export class OperationsRepository {
       },
       include: {
         product: true,
+      },
+    });
+  }
+
+  getOrderReversalByOriginalId(reversalOfOrderId: string, db: DbClient = this.prisma) {
+    return db.productOrder.findFirst({
+      where: { reversalOfOrderId },
+      include: {
+        product: true,
+        createdByUser: true,
+      },
+    });
+  }
+
+  getOrderReversalsByOriginalIds(ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this.prisma.productOrder.findMany({
+      where: {
+        reversalOfOrderId: {
+          in: ids,
+        },
+      },
+      include: {
+        product: true,
+        createdByUser: true,
       },
     });
   }

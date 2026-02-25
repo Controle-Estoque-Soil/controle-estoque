@@ -39,3 +39,9 @@ export const movementListQuerySchema = z.object({
 });
 
 export type MovementListQuery = z.infer<typeof movementListQuerySchema>;
+
+export const movementIdParamsSchema = z.object({
+  id: z.string().min(1),
+});
+
+export type MovementIdParams = z.infer<typeof movementIdParamsSchema>;

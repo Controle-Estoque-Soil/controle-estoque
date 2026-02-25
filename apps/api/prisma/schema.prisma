@@ -93,11 +93,14 @@ model StockMovement {
   reason          StockMovementReason
   referenceType   StockMovementReferenceType @map("reference_type")
   referenceId     String?                    @map("reference_id")
+  reversalOfMovementId String?               @unique @map("reversal_of_movement_id")
   note            String?
   createdAt       DateTime                   @default(now()) @map("created_at")
   createdByUserId String                     @map("created_by_user_id")
   item            Item                       @relation(fields: [itemId], references: [id], onDelete: Restrict)
   createdByUser   User                       @relation("movement_created_by", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reversalOfMovement StockMovement?          @relation("stock_movement_reversal", fields: [reversalOfMovementId], references: [id], onDelete: Restrict)
+  reversalMovement   StockMovement?          @relation("stock_movement_reversal")
 
   @@index([itemId, createdAt])
   @@index([createdAt])
@@ -112,12 +115,15 @@ model ProductOrder {
   productQty      Decimal            @db.Decimal(18, 6) @map("product_qty")
   totalCost       Decimal?           @db.Decimal(18, 6) @map("total_cost")
   unitCost        Decimal?           @db.Decimal(18, 6) @map("unit_cost")
+  reversalOfOrderId String?          @unique @map("reversal_of_order_id")
   note            String?
   createdAt       DateTime           @default(now()) @map("created_at")
   createdByUserId String             @map("created_by_user_id")
   product         Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
   createdByUser   User               @relation("order_created_by", fields: [createdByUserId], references: [id], onDelete: Restrict)
   lines           ProductOrderLine[]
+  reversalOfOrder ProductOrder?      @relation("product_order_reversal", fields: [reversalOfOrderId], references: [id], onDelete: Restrict)
+  reversalOrder   ProductOrder?      @relation("product_order_reversal")
 
   @@index([productId, createdAt])
   @@index([type, createdAt])

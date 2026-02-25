@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 
 import { appErrors } from '../../core/app-error';
@@ -10,6 +11,7 @@ type OperationDirection = 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
 
 type ProductWithBom = Awaited<ReturnType<OperationsRepository['getProductWithBom']>>;
 type OrderDetailRecord = NonNullable<Awaited<ReturnType<OperationsRepository['getOrderById']>>>;
+type MovementRecord = NonNullable<Awaited<ReturnType<OperationsRepository['getMovementById']>>>;
 
 type PlannedLine = {
   itemId: string;
@@ -79,8 +81,38 @@ function parseDateRange(input: { from?: string; to?: string }) {
   };
 }
 
+function buildMovementReferenceCandidate(): string {
+  return `MOV-${createHash('sha256').update(randomUUID()).digest('hex').slice(0, 16).toUpperCase()}`;
+}
+
 export class OperationsService {
   constructor(private readonly operationsRepository: OperationsRepository) {}
+
+  private async generateUniqueMovementReferenceId(tx: Prisma.TransactionClient): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = buildMovementReferenceCandidate();
+      const existing = await tx.stockMovement.findFirst({
+        where: { referenceId: candidate },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+    }
+
+    throw appErrors.internal('Failed to generate unique movement reference');
+  }
+
+  private buildUndoMovementNote(originalMovement: MovementRecord) {
+    const originalNote = originalMovement.note?.trim();
+    return [`[UNDO_MOVEMENT:${originalMovement.id}]`, originalNote].filter(Boolean).join(' ');
+  }
+
+  private buildUndoOrderNote(order: OrderDetailRecord) {
+    const originalNote = order.note?.trim();
+    return [`[UNDO_ORDER:${order.id}]`, originalNote].filter(Boolean).join(' ');
+  }
 
   private async buildPlan(
     type: OperationDirection,
@@ -264,6 +296,207 @@ export class OperationsService {
     return serializeOrderDetail(order);
   }
 
+  async undoMovement(id: string, actor: JwtUserPayload) {
+    const result = await this.operationsRepository.transaction(async (tx) => {
+      const movement = await this.operationsRepository.getMovementById(id, tx);
+      if (!movement) {
+        throw appErrors.notFound('Movimentacao nao encontrada');
+      }
+
+      if (movement.referenceType === 'PRODUCT_ORDER' && movement.referenceId) {
+        return this.undoProductOrderMovement(movement, actor, tx);
+      }
+
+      return this.undoItemMovement(movement, actor, tx);
+    });
+
+    return result;
+  }
+
+  private async undoItemMovement(movement: MovementRecord, actor: JwtUserPayload, tx: Prisma.TransactionClient) {
+    if (movement.note?.startsWith('[PRODUTO_ESTOQUE]')) {
+      throw appErrors.conflict(
+        'Nao e possivel desfazer individualmente uma movimentacao automatica de produto em estoque. Ajuste o produto novamente.',
+      );
+    }
+
+    if (movement.reversalOfMovementId) {
+      throw appErrors.conflict('Nao e permitido desfazer uma movimentacao de reversao');
+    }
+
+    const existingReversal = await this.operationsRepository.getMovementReversalByOriginalId(movement.id, tx);
+    if (existingReversal) {
+      throw appErrors.conflict('Movimentacao ja foi desfeita');
+    }
+
+    await this.operationsRepository.lockItems([movement.itemId], tx);
+    const [item] = await this.operationsRepository.getItemsByIds([movement.itemId], tx);
+    if (!item) {
+      throw appErrors.notFound('Item da movimentacao nao encontrado');
+    }
+
+    const inverseDelta = movement.deltaQty.neg();
+    const nextQty = item.qtyOnHand.add(inverseDelta);
+    if (nextQty.isNegative()) {
+      throw appErrors.conflict('Nao e possivel desfazer: o item ficaria com estoque negativo');
+    }
+
+    await this.operationsRepository.updateItemQty(item.id, nextQty, tx);
+
+    const movementReferenceId = await this.generateUniqueMovementReferenceId(tx);
+    const reversalMovement = await tx.stockMovement.create({
+      data: {
+        itemId: item.id,
+        deltaQty: inverseDelta,
+        reason: 'MANUAL_ADJUSTMENT',
+        referenceType: 'MANUAL_ADJUSTMENT',
+        referenceId: movementReferenceId,
+        reversalOfMovementId: movement.id,
+        note: this.buildUndoMovementNote(movement),
+        createdByUserId: actor.sub,
+      },
+      include: {
+        item: true,
+        createdByUser: true,
+      },
+    });
+
+    return {
+      kind: 'ITEM_MOVEMENT' as const,
+      originalMovementId: movement.id,
+      reversalMovementId: reversalMovement.id,
+      referenceId: reversalMovement.referenceId,
+      item: {
+        id: reversalMovement.item.id,
+        name: reversalMovement.item.name,
+        sku: reversalMovement.item.sku,
+        unit: reversalMovement.item.unit,
+      },
+      deltaQty: decimalToString(reversalMovement.deltaQty) ?? '0',
+    };
+  }
+
+  private async undoProductOrderMovement(movement: MovementRecord, actor: JwtUserPayload, tx: Prisma.TransactionClient) {
+    const orderId = movement.referenceId;
+    if (!orderId) {
+      throw appErrors.badRequest('Movimentacao de produto sem referencia de ordem');
+    }
+
+    const order = await this.operationsRepository.getOrderById(orderId, tx);
+    if (!order) {
+      throw appErrors.notFound('Ordem da movimentacao nao encontrada');
+    }
+
+    if (order.reversalOfOrderId) {
+      throw appErrors.conflict('Nao e permitido desfazer uma ordem de reversao');
+    }
+
+    const existingReversalOrder = await this.operationsRepository.getOrderReversalByOriginalId(order.id, tx);
+    if (existingReversalOrder) {
+      throw appErrors.conflict('Movimentacao de produto ja foi desfeita');
+    }
+
+    await this.operationsRepository.lockProduct(order.productId, tx);
+
+    const itemIds = Array.from(new Set(order.lines.map((line) => line.itemId))).sort();
+    if (itemIds.length > 0) {
+      await this.operationsRepository.lockItems(itemIds, tx);
+    }
+
+    const items = await this.operationsRepository.getItemsByIds(itemIds, tx);
+    const itemsMap = new Map(items.map((item) => [item.id, item]));
+    if (items.length !== itemIds.length) {
+      throw appErrors.badRequest('A ordem referencia item(s) inexistente(s)');
+    }
+
+    for (const line of order.lines) {
+      const currentItem = itemsMap.get(line.itemId);
+      if (!currentItem) {
+        throw appErrors.badRequest('A ordem referencia item(s) inexistente(s)');
+      }
+
+      const inverseDelta = order.type === 'OUTBOUND_PRODUCT' ? line.itemQty : line.itemQty.neg();
+      const nextQty = currentItem.qtyOnHand.add(inverseDelta);
+      if (nextQty.isNegative()) {
+        throw appErrors.conflict(`Nao e possivel desfazer: item ${currentItem.name} ficaria com estoque negativo`);
+      }
+
+      await this.operationsRepository.updateItemQty(currentItem.id, nextQty, tx);
+    }
+
+    if (order.type === 'OUTBOUND_PRODUCT') {
+      const product = await this.operationsRepository.getProductById(order.productId, tx);
+      if (!product) {
+        throw appErrors.notFound('Produto da ordem nao encontrado');
+      }
+
+      const nextSoldTotal = product.qtySoldTotal.sub(order.productQty);
+      if (nextSoldTotal.isNegative()) {
+        throw appErrors.conflict('Nao e possivel desfazer: contador "Ja sairam" ficaria negativo');
+      }
+
+      await this.operationsRepository.updateProductQtyCounters(
+        product.id,
+        {
+          qtySoldTotal: nextSoldTotal,
+        },
+        tx,
+      );
+    }
+
+    const reversalType: OperationDirection = order.type === 'OUTBOUND_PRODUCT' ? 'INBOUND_PRODUCT' : 'OUTBOUND_PRODUCT';
+    const undoNote = this.buildUndoOrderNote(order);
+    const reversalOrder = await this.operationsRepository.createProductOrder(
+      {
+        type: reversalType,
+        productId: order.productId,
+        productQty: order.productQty,
+        totalCost: order.totalCost ?? new Prisma.Decimal(0),
+        unitCost: order.unitCost ?? new Prisma.Decimal(0),
+        note: undoNote,
+        reversalOfOrderId: order.id,
+        createdByUserId: actor.sub,
+      },
+      tx,
+    );
+
+    await this.operationsRepository.createProductOrderLines(
+      reversalOrder.id,
+      order.lines.map((line) => ({
+        itemId: line.itemId,
+        itemQty: line.itemQty,
+        itemUnitPriceSnapshot: line.itemUnitPriceSnapshot,
+        lineCost: line.lineCost,
+      })),
+      tx,
+    );
+
+    await this.operationsRepository.createStockMovements(
+      order.lines.map((line) => ({
+        itemId: line.itemId,
+        deltaQty: order.type === 'OUTBOUND_PRODUCT' ? line.itemQty : line.itemQty.neg(),
+        reason: order.type === 'OUTBOUND_PRODUCT' ? 'PRODUCT_INBOUND' : 'PRODUCT_OUTBOUND',
+        referenceId: reversalOrder.id,
+        note: undoNote,
+        createdByUserId: actor.sub,
+      })),
+      tx,
+    );
+
+    return {
+      kind: 'PRODUCT_ORDER' as const,
+      originalOrderId: order.id,
+      reversalOrderId: reversalOrder.id,
+      product: {
+        id: order.product.id,
+        name: order.product.name,
+        sku: order.product.sku,
+      },
+      type: reversalType,
+      productQty: decimalToString(order.productQty) ?? '0',
+    };
+  }
+
   async listOrders(query: OperationListQuery) {
     const dateRange = parseDateRange(query);
     const orders = await this.operationsRepository.listOrders({
@@ -324,6 +557,16 @@ export class OperationsService {
 
     const productOrders = await this.operationsRepository.getOrdersByIds(productOrderIds);
     const productOrdersMap = new Map(productOrders.map((order) => [order.id, order]));
+    const productOrderReversals = await this.operationsRepository.getOrderReversalsByOriginalIds(productOrderIds);
+    const productOrderReversalByOriginalId = new Map(productOrderReversals.map((order) => [order.reversalOfOrderId as string, order]));
+
+    const manualMovementIds = movements
+      .filter((movement) => movement.referenceType !== 'PRODUCT_ORDER')
+      .map((movement) => movement.id);
+    const movementReversals = await this.operationsRepository.getMovementReversalsByOriginalIds(manualMovementIds);
+    const movementReversalByOriginalId = new Map(
+      movementReversals.map((movement) => [movement.reversalOfMovementId as string, movement]),
+    );
 
     return movements.map((movement) => ({
       productOrder:
@@ -333,10 +576,15 @@ export class OperationsService {
               if (!order) {
                 return null;
               }
+              const reversalOrder = productOrderReversalByOriginalId.get(order.id);
               return {
                 id: order.id,
                 type: order.type,
                 productQty: decimalToString(order.productQty) ?? '0',
+                reversalOfOrderId: order.reversalOfOrderId,
+                isReversal: Boolean(order.reversalOfOrderId),
+                isUndone: Boolean(reversalOrder),
+                reversalOrderId: reversalOrder?.id ?? null,
                 product: {
                   id: order.product.id,
                   name: order.product.name,
@@ -351,6 +599,13 @@ export class OperationsService {
       reason: movement.reason,
       referenceType: movement.referenceType,
       referenceId: movement.referenceId,
+      reversalOfMovementId: movement.reversalOfMovementId,
+      isReversal: Boolean(movement.reversalOfMovementId),
+      isUndone:
+        movement.referenceType === 'PRODUCT_ORDER'
+          ? Boolean(movement.referenceId && productOrderReversalByOriginalId.has(movement.referenceId))
+          : movementReversalByOriginalId.has(movement.id),
+      reversalMovementId: movement.referenceType === 'PRODUCT_ORDER' ? null : movementReversalByOriginalId.get(movement.id)?.id ?? null,
       note: movement.note,
       createdAt: movement.createdAt.toISOString(),
       item: {

@@ -5,6 +5,7 @@ import { OperationsRepository } from './operations.repository';
 import { OperationsService } from './operations.service';
 import {
   movementListQuerySchema,
+  movementIdParamsSchema,
   operationExecuteBodySchema,
   operationIdParamsSchema,
   operationListQuerySchema,
@@ -75,5 +76,13 @@ export const operationsRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       data: await service.listMovements(query),
     };
+  });
+
+  fastify.post('/movements/:id/undo', async (request, reply) => {
+    fastify.requireRole(request, 'ADMIN');
+    const params = parseWithSchema(movementIdParamsSchema, request.params);
+    const service = new OperationsService(new OperationsRepository(fastify.prisma));
+    const result = await service.undoMovement(params.id, request.user);
+    return reply.status(201).send({ data: result });
   });
 };
