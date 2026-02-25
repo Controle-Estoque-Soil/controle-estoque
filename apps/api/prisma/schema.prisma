@@ -59,13 +59,15 @@ model Item {
 }
 
 model Product {
-  id        String           @id @default(cuid())
-  name      String
-  sku       String           @unique
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
-  bomItems  ProductBomItem[]
-  orders    ProductOrder[]
+  id           String           @id @default(cuid())
+  name         String
+  sku          String           @unique
+  qtyInStock   Decimal          @db.Decimal(18, 6) @default(0) @map("qty_in_stock")
+  qtySoldTotal Decimal          @db.Decimal(18, 6) @default(0) @map("qty_sold_total")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  bomItems     ProductBomItem[]
+  orders       ProductOrder[]
 
   @@index([name])
   @@map("products")

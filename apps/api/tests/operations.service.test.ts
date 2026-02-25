@@ -145,6 +145,7 @@ function buildRepositoryMock(options?: { insufficientStock?: boolean; failOnLine
     lockItems: vi.fn(async () => []),
     getItemsByIds: vi.fn(async () => items),
     updateItemQty: vi.fn(async (id: string, qtyOnHand: Prisma.Decimal) => ({ id, qtyOnHand })),
+    incrementProductSoldTotal: vi.fn(async () => ({ id: 'prod_1' })),
     createProductOrder: vi.fn(async () => ({ id: 'order_1' })),
     createProductOrderLines: vi.fn(async () => {
       if (options?.failOnLines) {
@@ -208,6 +209,10 @@ describe('OperationsService.execute', () => {
     }
     expect(movementPayload[0].deltaQty.toString()).toBe('-4');
     expect(movementPayload[1].deltaQty.toString()).toBe('-3');
+    const incrementProductSoldTotalMock = repository.incrementProductSoldTotal as unknown as { mock: { calls: unknown[][] } };
+    const incrementCall = incrementProductSoldTotalMock.mock.calls[0] as [string, Prisma.Decimal] | undefined;
+    expect(incrementCall?.[0]).toBe('prod_1');
+    expect(incrementCall?.[1].toString()).toBe('2');
     expect(result.id).toBe('order_1');
   });
 
@@ -236,6 +241,7 @@ describe('OperationsService.execute', () => {
 
     expect(repository.createProductOrder).not.toHaveBeenCalled();
     expect(repository.updateItemQty).not.toHaveBeenCalled();
+    expect(repository.incrementProductSoldTotal).not.toHaveBeenCalled();
   });
 
   it('stores order line price snapshots from current item prices', async () => {
@@ -293,5 +299,6 @@ describe('OperationsService.execute', () => {
     expect(repository.createProductOrder).toHaveBeenCalledTimes(1);
     expect(repository.updateItemQty).not.toHaveBeenCalled();
     expect(repository.createStockMovements).not.toHaveBeenCalled();
+    expect(repository.incrementProductSoldTotal).not.toHaveBeenCalled();
   });
 });

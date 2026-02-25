@@ -14,6 +14,8 @@ type ProductRecord = {
   id: string;
   name: string;
   sku: string;
+  qtyInStock: string;
+  qtySoldTotal: string;
   bomItemsCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -37,6 +39,8 @@ function emptyProductForm() {
   return {
     name: '',
     sku: '',
+    qtyInStock: '0',
+    qtySoldTotal: '0',
   };
 }
 
@@ -99,6 +103,8 @@ export default function ProductsPage() {
       setEditForm({
         name: response.data.name,
         sku: response.data.sku,
+        qtyInStock: response.data.qtyInStock ?? '0',
+        qtySoldTotal: response.data.qtySoldTotal ?? '0',
       });
       setBomLines(response.bom.map((line) => ({ itemId: line.itemId, qtyRequired: line.qtyRequired })));
     } catch (caughtError) {
@@ -327,6 +333,8 @@ export default function ProductsPage() {
                 <tr>
                   <th>Produto</th>
                   <th>SKU</th>
+                  <th>Em estoque</th>
+                  <th>Ja sairam</th>
                   <th>BOM</th>
                   <th>Ações</th>
                 </tr>
@@ -334,13 +342,15 @@ export default function ProductsPage() {
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={4}>Nenhum produto cadastrado.</td>
+                    <td colSpan={6}>Nenhum produto cadastrado.</td>
                   </tr>
                 ) : (
                   products.map((product) => (
                     <tr key={product.id}>
                       <td>{product.name}</td>
                       <td>{product.sku}</td>
+                      <td>{formatDecimal(product.qtyInStock)}</td>
+                      <td>{formatDecimal(product.qtySoldTotal)}</td>
                       <td>{product.bomItemsCount ?? 0} itens</td>
                       <td>
                         <div className="actions">
@@ -383,6 +393,24 @@ export default function ProductsPage() {
                   onChange={(e) => setCreateForm({ ...createForm, sku: e.target.value })}
                 />
               </div>
+              <div className="field">
+                <label htmlFor="create-product-qty-in-stock">Produtos em estoque (manual)</label>
+                <input
+                  id="create-product-qty-in-stock"
+                  className="input"
+                  value={createForm.qtyInStock}
+                  onChange={(e) => setCreateForm({ ...createForm, qtyInStock: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="create-product-qty-sold-total">Produtos ja sairam (manual)</label>
+                <input
+                  id="create-product-qty-sold-total"
+                  className="input"
+                  value={createForm.qtySoldTotal}
+                  onChange={(e) => setCreateForm({ ...createForm, qtySoldTotal: e.target.value })}
+                />
+              </div>
               <div className="actions full">
                 <button type="submit" className="button" disabled={saving}>
                   {saving ? 'Salvando...' : 'Criar produto'}
@@ -415,6 +443,24 @@ export default function ProductsPage() {
                       placeholder="Gera novo SKU automaticamente se vazio"
                       value={editForm.sku}
                       onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="edit-product-qty-in-stock">Produtos em estoque (manual)</label>
+                    <input
+                      id="edit-product-qty-in-stock"
+                      className="input"
+                      value={editForm.qtyInStock}
+                      onChange={(e) => setEditForm({ ...editForm, qtyInStock: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="edit-product-qty-sold-total">Produtos ja sairam (manual/auto)</label>
+                    <input
+                      id="edit-product-qty-sold-total"
+                      className="input"
+                      value={editForm.qtySoldTotal}
+                      onChange={(e) => setEditForm({ ...editForm, qtySoldTotal: e.target.value })}
                     />
                   </div>
                   <div className="actions full">

@@ -1,0 +1,5 @@
+ALTER TABLE "products"
+ADD COLUMN "qty_in_stock" NUMERIC(18, 6) NOT NULL DEFAULT 0;
+
+ALTER TABLE "products"
+ADD COLUMN "qty_sold_total" NUMERIC(18, 6) NOT NULL DEFAULT 0;

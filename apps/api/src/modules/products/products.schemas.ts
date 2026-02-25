@@ -16,6 +16,8 @@ export const productIdParamsSchema = z.object({
 export const productCreateBodySchema = z.object({
   name: z.string().min(1).max(150),
   sku: optionalSkuSchema,
+  qtyInStock: nonNegativeDecimalStringSchema.optional(),
+  qtySoldTotal: nonNegativeDecimalStringSchema.optional(),
 });
 
 export type ProductCreateBody = z.infer<typeof productCreateBodySchema>;
@@ -24,6 +26,8 @@ export const productUpdateBodySchema = z
   .object({
     name: z.string().min(1).max(150).optional(),
     sku: optionalSkuSchema,
+    qtyInStock: nonNegativeDecimalStringSchema.optional(),
+    qtySoldTotal: nonNegativeDecimalStringSchema.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, 'At least one field is required');
 

@@ -50,13 +50,20 @@ export class ProductsRepository {
     });
   }
 
-  create(data: { name: string; sku: string }, db: DbClient = this.prisma) {
+  create(
+    data: { name: string; sku: string; qtyInStock?: Prisma.Decimal; qtySoldTotal?: Prisma.Decimal },
+    db: DbClient = this.prisma,
+  ) {
     return db.product.create({
       data,
     });
   }
 
-  update(id: string, data: { name?: string; sku?: string }, db: DbClient = this.prisma) {
+  update(
+    id: string,
+    data: { name?: string; sku?: string; qtyInStock?: Prisma.Decimal; qtySoldTotal?: Prisma.Decimal },
+    db: DbClient = this.prisma,
+  ) {
     return db.product.update({
       where: { id },
       data,

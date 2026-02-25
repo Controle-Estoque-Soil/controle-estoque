@@ -249,6 +249,10 @@ export class OperationsService {
         tx,
       );
 
+      if (type === 'OUTBOUND_PRODUCT') {
+        await this.operationsRepository.incrementProductSoldTotal(plan.product.id, plan.productQty, tx);
+      }
+
       const detailedOrder = await this.operationsRepository.getOrderById(orderRecord.id, tx);
       if (!detailedOrder) {
         throw appErrors.internal('Failed to load created operation');

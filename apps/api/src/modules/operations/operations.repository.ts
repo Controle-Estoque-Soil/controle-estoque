@@ -44,6 +44,17 @@ export class OperationsRepository {
     });
   }
 
+  incrementProductSoldTotal(productId: string, deltaQty: Prisma.Decimal, db: DbClient = this.prisma) {
+    return db.product.update({
+      where: { id: productId },
+      data: {
+        qtySoldTotal: {
+          increment: deltaQty,
+        },
+      },
+    });
+  }
+
   createProductOrder(
     data: {
       type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';

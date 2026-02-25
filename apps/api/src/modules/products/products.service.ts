@@ -26,6 +26,8 @@ function serializeProduct(product: {
   id: string;
   name: string;
   sku: string;
+  qtyInStock: Prisma.Decimal;
+  qtySoldTotal: Prisma.Decimal;
   createdAt: Date;
   updatedAt: Date;
   _count?: { bomItems: number };
@@ -34,6 +36,8 @@ function serializeProduct(product: {
     id: product.id,
     name: product.name,
     sku: product.sku,
+    qtyInStock: decimalToString(product.qtyInStock) ?? '0',
+    qtySoldTotal: decimalToString(product.qtySoldTotal) ?? '0',
     bomItemsCount: product._count?.bomItems,
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
@@ -80,6 +84,8 @@ export class ProductsService {
     const product = await this.productsRepository.create({
       name: input.name.trim(),
       sku: normalizeSku(input.sku) ?? generateAutoSku('PRD'),
+      qtyInStock: input.qtyInStock ? toDecimal(input.qtyInStock) : undefined,
+      qtySoldTotal: input.qtySoldTotal ? toDecimal(input.qtySoldTotal) : undefined,
     });
 
     return serializeProduct(product);
@@ -94,6 +100,8 @@ export class ProductsService {
     const product = await this.productsRepository.update(id, {
       name: input.name?.trim(),
       sku: resolveProductSkuForUpdate(input.sku),
+      qtyInStock: input.qtyInStock !== undefined ? toDecimal(input.qtyInStock) : undefined,
+      qtySoldTotal: input.qtySoldTotal !== undefined ? toDecimal(input.qtySoldTotal) : undefined,
     });
 
     return serializeProduct(product);
