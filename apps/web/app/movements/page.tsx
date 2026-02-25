@@ -102,6 +102,14 @@ function movementSourceLabel(movement: MovementRecord): string {
   return movement.referenceType;
 }
 
+function shouldHideUndoneMovementRow(movement: MovementRecord): boolean {
+  if (movement.productOrder) {
+    return Boolean(movement.productOrder.isUndone || movement.productOrder.isReversal);
+  }
+
+  return Boolean(movement.isUndone || movement.isReversal);
+}
+
 export default function MovementsPage() {
   const { token, user } = useAuth();
   const [items, setItems] = useState<ItemOption[]>([]);
@@ -120,6 +128,10 @@ export default function MovementsPage() {
     const seenProductOrderRefs = new Set<string>();
 
     for (const movement of movements) {
+      if (shouldHideUndoneMovementRow(movement)) {
+        continue;
+      }
+
       if (movement.productOrder && movement.referenceId) {
         const key = `PRODUCT_ORDER:${movement.referenceId}`;
         if (seenProductOrderRefs.has(key)) {
