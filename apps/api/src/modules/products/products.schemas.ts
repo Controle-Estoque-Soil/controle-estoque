@@ -5,6 +5,8 @@ const nonNegativeDecimalStringSchema = z
   .trim()
   .regex(/^\d+(\.\d+)?$/, 'Invalid non-negative decimal value');
 
+const optionalProductLeadTimeSchema = z.string().trim().min(1).max(120);
+
 const optionalSkuSchema = z
   .union([z.string().trim().max(80), z.literal('')])
   .optional();
@@ -16,7 +18,7 @@ export const productIdParamsSchema = z.object({
 export const productCreateBodySchema = z.object({
   name: z.string().min(1).max(150),
   sku: optionalSkuSchema,
-  manufacturingLeadTimeDays: nonNegativeDecimalStringSchema.optional(),
+  manufacturingLeadTimeDays: optionalProductLeadTimeSchema.optional(),
   qtyInStock: nonNegativeDecimalStringSchema.optional(),
   qtySoldTotal: nonNegativeDecimalStringSchema.optional(),
 });
@@ -27,7 +29,7 @@ export const productUpdateBodySchema = z
   .object({
     name: z.string().min(1).max(150).optional(),
     sku: optionalSkuSchema,
-    manufacturingLeadTimeDays: nonNegativeDecimalStringSchema.nullable().optional(),
+    manufacturingLeadTimeDays: optionalProductLeadTimeSchema.nullable().optional(),
     qtyInStock: nonNegativeDecimalStringSchema.optional(),
     qtySoldTotal: nonNegativeDecimalStringSchema.optional(),
   })

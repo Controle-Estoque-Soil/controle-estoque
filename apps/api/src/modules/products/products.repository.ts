@@ -68,7 +68,7 @@ export class ProductsRepository {
     data: {
       name: string;
       sku: string;
-      manufacturingLeadTimeDays?: Prisma.Decimal | null;
+      manufacturingLeadTimeDays?: string | null;
       qtyInStock?: Prisma.Decimal;
       qtySoldTotal?: Prisma.Decimal;
     },
@@ -84,7 +84,7 @@ export class ProductsRepository {
     data: {
       name?: string;
       sku?: string;
-      manufacturingLeadTimeDays?: Prisma.Decimal | null;
+      manufacturingLeadTimeDays?: string | null;
       qtyInStock?: Prisma.Decimal;
       qtySoldTotal?: Prisma.Decimal;
     },

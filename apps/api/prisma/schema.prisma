@@ -63,7 +63,7 @@ model Product {
   id           String           @id @default(cuid())
   name         String
   sku          String           @unique
-  manufacturingLeadTimeDays Decimal? @db.Decimal(18, 6) @map("manufacturing_lead_time_days")
+  manufacturingLeadTimeDays String?  @db.Text @map("manufacturing_lead_time_days")
   qtyInStock   Decimal          @db.Decimal(18, 6) @default(0) @map("qty_in_stock")
   qtySoldTotal Decimal          @db.Decimal(18, 6) @default(0) @map("qty_sold_total")
   createdAt    DateTime         @default(now()) @map("created_at")

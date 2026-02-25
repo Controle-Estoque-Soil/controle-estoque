@@ -452,7 +452,7 @@ export default function ProductsPage() {
                 <input
                   id="create-product-manufacturing-lead-time"
                   className="input"
-                  placeholder="Ex.: 2 ou 1.5"
+                  placeholder="Ex.: 2 Horas, 3 Dias, 1 semana"
                   value={createForm.manufacturingLeadTimeDays}
                   onChange={(e) => setCreateForm({ ...createForm, manufacturingLeadTimeDays: e.target.value })}
                 />
@@ -516,7 +516,7 @@ export default function ProductsPage() {
                     <input
                       id="edit-product-manufacturing-lead-time"
                       className="input"
-                      placeholder="Ex.: 2 ou 1.5"
+                      placeholder="Ex.: 2 Horas, 3 Dias, 1 semana"
                       value={editForm.manufacturingLeadTimeDays}
                       onChange={(e) => setEditForm({ ...editForm, manufacturingLeadTimeDays: e.target.value })}
                     />
