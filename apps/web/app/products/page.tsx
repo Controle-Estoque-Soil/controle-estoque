@@ -16,6 +16,17 @@ type ProductRecord = {
   sku: string;
   qtyInStock: string;
   qtySoldTotal: string;
+  productionCapacity?: string;
+  productionCapacityLimiters?: Array<{
+    itemId: string;
+    itemName: string;
+    itemSku: string;
+    itemUnit: string;
+    itemQtyOnHand: string;
+    qtyRequiredPerProduct: string;
+    maxProductsFromItem: string;
+  }>;
+  productionCapacityNotes?: string[];
   bomItemsCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +70,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ product: ProductRecord; qty: string } | null>(null);
+  const [capacityDialogProduct, setCapacityDialogProduct] = useState<ProductRecord | null>(null);
 
   const bomItemOptions = useMemo(() => items, [items]);
 
@@ -236,6 +248,10 @@ export default function ProductsPage() {
     setDeleteDialog(null);
   }
 
+  function closeCapacityDialog() {
+    setCapacityDialogProduct(null);
+  }
+
   async function handleDeleteDialogQuantity() {
     if (!deleteDialog) {
       return;
@@ -335,6 +351,7 @@ export default function ProductsPage() {
                   <th>SKU</th>
                   <th>Em estoque</th>
                   <th>Ja sairam</th>
+                  <th>Capacidade de producao</th>
                   <th>BOM</th>
                   <th>Ações</th>
                 </tr>
@@ -342,7 +359,7 @@ export default function ProductsPage() {
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>Nenhum produto cadastrado.</td>
+                    <td colSpan={7}>Nenhum produto cadastrado.</td>
                   </tr>
                 ) : (
                   products.map((product) => (
@@ -351,6 +368,19 @@ export default function ProductsPage() {
                       <td>{product.sku}</td>
                       <td>{formatDecimal(product.qtyInStock)}</td>
                       <td>{formatDecimal(product.qtySoldTotal)}</td>
+                      <td>
+                        <div className="actions" style={{ gap: '0.4rem' }}>
+                          <span>{formatDecimal(product.productionCapacity ?? '0')} un</span>
+                          <button
+                            type="button"
+                            className="button ghost"
+                            style={{ padding: '0.35rem 0.6rem' }}
+                            onClick={() => setCapacityDialogProduct(product)}
+                          >
+                            Ver mais
+                          </button>
+                        </div>
+                      </td>
                       <td>{product.bomItemsCount ?? 0} itens</td>
                       <td>
                         <div className="actions">
@@ -587,6 +617,84 @@ export default function ProductsPage() {
           onConfirmQuantity={handleDeleteDialogQuantity}
           onConfirmDeleteAll={handleDeleteDialogAll}
         />
+        {capacityDialogProduct ? (
+          <div className="modal-overlay" role="presentation" onClick={closeCapacityDialog}>
+            <div
+              className="modal-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="capacity-dialog-title"
+              style={{ width: 'min(820px, 100%)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                <div>
+                  <h3 id="capacity-dialog-title">Capacidade de producao</h3>
+                  <p className="small" style={{ margin: 0 }}>
+                    {capacityDialogProduct.name} ({capacityDialogProduct.sku})
+                  </p>
+                </div>
+                <button type="button" className="button ghost" onClick={closeCapacityDialog}>
+                  Fechar
+                </button>
+              </div>
+
+              <div className="panel" style={{ padding: '0.75rem' }}>
+                <div className="small">Capacidade calculada</div>
+                <div className="card-value" style={{ fontSize: '1.25rem' }}>
+                  {formatDecimal(capacityDialogProduct.productionCapacity ?? '0')} un
+                </div>
+              </div>
+
+              {capacityDialogProduct.productionCapacityNotes && capacityDialogProduct.productionCapacityNotes.length > 0 ? (
+                <div className="alert-block warn">
+                  {capacityDialogProduct.productionCapacityNotes.map((note, index) => (
+                    <div key={`${note}-${index}`}>{note}</div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div>
+                <h3 style={{ marginTop: 0 }}>Item(ns) limitante(s)</h3>
+                {capacityDialogProduct.productionCapacityLimiters &&
+                capacityDialogProduct.productionCapacityLimiters.length > 0 ? (
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th>SKU</th>
+                          <th>Estoque atual</th>
+                          <th>Necessario por produto</th>
+                          <th>Produz ate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {capacityDialogProduct.productionCapacityLimiters.map((limiter) => (
+                          <tr key={`${limiter.itemId}-${limiter.maxProductsFromItem}`}>
+                            <td>{limiter.itemName}</td>
+                            <td>{limiter.itemSku}</td>
+                            <td>
+                              {formatDecimal(limiter.itemQtyOnHand)} {limiter.itemUnit}
+                            </td>
+                            <td>
+                              {formatDecimal(limiter.qtyRequiredPerProduct)} {limiter.itemUnit}
+                            </td>
+                            <td>{formatDecimal(limiter.maxProductsFromItem)} un</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="small" style={{ margin: 0 }}>
+                    Nenhum item limitante encontrado para este produto.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </AppShell>
     </RequireAuth>
   );

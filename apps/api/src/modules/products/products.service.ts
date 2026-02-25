@@ -49,6 +49,61 @@ function serializeProduct(product: {
   };
 }
 
+function computeProductionCapacity(product: {
+  bomItems?: Array<{
+    qtyRequired: Prisma.Decimal;
+    item: { id: string; name: string; sku: string; unit: string; qtyOnHand: Prisma.Decimal };
+  }>;
+}) {
+  if (!product.bomItems || product.bomItems.length === 0) {
+    return {
+      productionCapacity: '0',
+      capacityLimiters: [] as Array<{
+        itemId: string;
+        itemName: string;
+        itemSku: string;
+        itemUnit: string;
+        itemQtyOnHand: string;
+        qtyRequiredPerProduct: string;
+        maxProductsFromItem: string;
+      }>,
+      capacityNotes: ['Produto sem BOM cadastrada.'],
+    };
+  }
+
+  const capacities = product.bomItems.map((bomItem) => {
+    const rawCapacity = bomItem.item.qtyOnHand.div(bomItem.qtyRequired);
+    const flooredCapacity = rawCapacity.floor();
+
+    return {
+      bomItem,
+      maxProductsFromItem: flooredCapacity,
+    };
+  });
+
+  const minCapacity = capacities.reduce((currentMin, entry) =>
+    entry.maxProductsFromItem.lt(currentMin) ? entry.maxProductsFromItem : currentMin,
+  capacities[0]?.maxProductsFromItem ?? new Prisma.Decimal(0));
+
+  const capacityLimiters = capacities
+    .filter((entry) => entry.maxProductsFromItem.eq(minCapacity))
+    .map((entry) => ({
+      itemId: entry.bomItem.item.id,
+      itemName: entry.bomItem.item.name,
+      itemSku: entry.bomItem.item.sku,
+      itemUnit: entry.bomItem.item.unit,
+      itemQtyOnHand: decimalToString(entry.bomItem.item.qtyOnHand) ?? '0',
+      qtyRequiredPerProduct: decimalToString(entry.bomItem.qtyRequired) ?? '0',
+      maxProductsFromItem: decimalToString(entry.maxProductsFromItem) ?? '0',
+    }));
+
+  return {
+    productionCapacity: decimalToString(minCapacity) ?? '0',
+    capacityLimiters,
+    capacityNotes: [] as string[],
+  };
+}
+
 export class ProductsService {
   constructor(private readonly productsRepository: ProductsRepository) {}
 
@@ -73,7 +128,15 @@ export class ProductsService {
       search: query.search?.trim() || undefined,
     });
 
-    return products.map(serializeProduct);
+    return products.map((product) => {
+      const capacity = computeProductionCapacity(product);
+      return {
+        ...serializeProduct(product),
+        productionCapacity: capacity.productionCapacity,
+        productionCapacityLimiters: capacity.capacityLimiters,
+        productionCapacityNotes: capacity.capacityNotes,
+      };
+    });
   }
 
   async getById(id: string) {

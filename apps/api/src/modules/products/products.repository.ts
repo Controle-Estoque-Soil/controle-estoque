@@ -26,6 +26,20 @@ export class ProductsRepository {
         _count: {
           select: { bomItems: true },
         },
+        bomItems: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                unit: true,
+                qtyOnHand: true,
+              },
+            },
+          },
+          orderBy: [{ item: { name: 'asc' } }],
+        },
       },
     });
   }
