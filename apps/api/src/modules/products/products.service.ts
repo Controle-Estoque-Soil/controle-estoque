@@ -82,6 +82,15 @@ function computeProductionCapacity(product: {
         qtyRequiredPerProduct: string;
         maxProductsFromItem: string;
       }>,
+      capacityItems: [] as Array<{
+        itemId: string;
+        itemName: string;
+        itemSku: string;
+        itemUnit: string;
+        itemQtyOnHand: string;
+        qtyRequiredPerProduct: string;
+        maxProductsFromItem: string;
+      }>,
       capacityNotes: ['Produto sem BOM cadastrada.'],
     };
   }
@@ -100,8 +109,14 @@ function computeProductionCapacity(product: {
     entry.maxProductsFromItem.lt(currentMin) ? entry.maxProductsFromItem : currentMin,
   capacities[0]?.maxProductsFromItem ?? new Prisma.Decimal(0));
 
-  const capacityLimiters = capacities
-    .filter((entry) => entry.maxProductsFromItem.eq(minCapacity))
+  const capacityItems = capacities
+    .sort((a, b) => {
+      if (a.maxProductsFromItem.eq(b.maxProductsFromItem)) {
+        return a.bomItem.item.name.localeCompare(b.bomItem.item.name, 'pt-BR');
+      }
+
+      return a.maxProductsFromItem.lt(b.maxProductsFromItem) ? -1 : 1;
+    })
     .map((entry) => ({
       itemId: entry.bomItem.item.id,
       itemName: entry.bomItem.item.name,
@@ -112,9 +127,12 @@ function computeProductionCapacity(product: {
       maxProductsFromItem: decimalToString(entry.maxProductsFromItem) ?? '0',
     }));
 
+  const capacityLimiters = capacityItems.filter((entry) => entry.maxProductsFromItem === (decimalToString(minCapacity) ?? '0'));
+
   return {
     productionCapacity: decimalToString(minCapacity) ?? '0',
     capacityLimiters,
+    capacityItems,
     capacityNotes: [] as string[],
   };
 }
@@ -149,6 +167,7 @@ export class ProductsService {
         ...serializeProduct(product),
         productionCapacity: capacity.productionCapacity,
         productionCapacityLimiters: capacity.capacityLimiters,
+        productionCapacityItems: capacity.capacityItems,
         productionCapacityNotes: capacity.capacityNotes,
       };
     });

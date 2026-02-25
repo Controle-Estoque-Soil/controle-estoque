@@ -28,6 +28,15 @@ type ProductRecord = {
     qtyRequiredPerProduct: string;
     maxProductsFromItem: string;
   }>;
+  productionCapacityItems?: Array<{
+    itemId: string;
+    itemName: string;
+    itemSku: string;
+    itemUnit: string;
+    itemQtyOnHand: string;
+    qtyRequiredPerProduct: string;
+    maxProductsFromItem: string;
+  }>;
   productionCapacityNotes?: string[];
   bomItemsCount?: number;
   createdAt: string;
@@ -797,9 +806,13 @@ export default function ProductsPage() {
               ) : null}
 
               <div>
-                <h3 style={{ marginTop: 0 }}>Item(ns) limitante(s)</h3>
-                {capacityDialogProduct.productionCapacityLimiters &&
-                capacityDialogProduct.productionCapacityLimiters.length > 0 ? (
+                <h3 style={{ marginTop: 0 }}>Itens ordenados por limitacao (mais limitante primeiro)</h3>
+                {((capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
+                  ? capacityDialogProduct.productionCapacityItems
+                  : capacityDialogProduct.productionCapacityLimiters) &&
+                (((capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
+                  ? capacityDialogProduct.productionCapacityItems
+                  : capacityDialogProduct.productionCapacityLimiters)?.length ?? 0) > 0 ? (
                   <div className="table-wrap">
                     <table className="table">
                       <thead>
@@ -812,7 +825,11 @@ export default function ProductsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {capacityDialogProduct.productionCapacityLimiters.map((limiter) => (
+                        {(
+                          (capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
+                            ? capacityDialogProduct.productionCapacityItems
+                            : capacityDialogProduct.productionCapacityLimiters ?? []
+                        ).map((limiter) => (
                           <tr key={`${limiter.itemId}-${limiter.maxProductsFromItem}`}>
                             <td>{limiter.itemName}</td>
                             <td>{limiter.itemSku}</td>
