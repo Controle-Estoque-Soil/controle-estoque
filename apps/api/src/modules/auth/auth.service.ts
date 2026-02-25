@@ -8,6 +8,7 @@ import type { LoginBody, RegisterBody } from './auth.schemas';
 
 export interface PublicAuthUser {
   id: string;
+  name: string | null;
   email: string;
   role: Role;
   createdAt: string;
@@ -45,6 +46,7 @@ export class AuthService {
     const passwordHash = await this.passwordService.hash(input.password);
 
     return this.authRepository.createUser({
+      name: input.name?.trim() || null,
       email: normalizedEmail,
       passwordHash,
       role,
@@ -71,6 +73,7 @@ export class AuthService {
   toPublicUser(user: User): PublicAuthUser {
     return {
       id: user.id,
+      name: user.name,
       email: user.email,
       role: user.role,
       createdAt: user.createdAt.toISOString(),

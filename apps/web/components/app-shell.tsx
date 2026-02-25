@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { useAuth } from '@/components/auth-provider';
+import { formatUserDisplayName } from '@/lib/format';
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { ready, token } = useAuth();
@@ -38,6 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { href: '/products', label: 'Produtos' },
     { href: '/operations', label: 'Operações' },
     { href: '/movements', label: 'Movimentações' },
+    ...(user?.role === 'ADMIN' ? [{ href: '/users', label: 'Controle de usuários' }] : []),
   ];
 
   return (
@@ -61,7 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="shell-main">
         <header className="topbar">
           <div>
-            <p className="topbar-title">{user?.email ?? 'Usuário'}</p>
+            <p className="topbar-title">{user ? formatUserDisplayName(user) : 'Usuário'}</p>
             <p className="topbar-subtitle">{user?.role ?? '-'}</p>
           </div>
           <button type="button" className="button ghost" onClick={logout}>

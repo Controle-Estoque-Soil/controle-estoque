@@ -64,7 +64,6 @@ type ItemOperationPreview = {
   unitPrice: string;
   estimatedCost: string;
   canExecute: boolean;
-  requiresAdmin: boolean;
   negativeBlocked: boolean;
   minWarning: boolean;
 };
@@ -78,7 +77,7 @@ type OrderListRecord = {
   createdAt: string;
   note: string | null;
   product: { id: string; name: string; sku: string };
-  createdByUser: { id: string; email: string; role: string };
+  createdByUser: { id: string; name?: string | null; email: string; role: string };
   linesCount: number;
 };
 
@@ -92,7 +91,7 @@ type OrderDetailRecord = {
   note: string | null;
   createdAt: string;
   product: { id: string; name: string; sku: string };
-  createdByUser: { id: string; email: string; role: string };
+  createdByUser: { id: string; name?: string | null; email: string; role: string };
   lines: Array<{
     id: string;
     itemId: string;
@@ -287,9 +286,8 @@ export default function OperationsPage() {
     const currentQty = Number(item.qtyOnHand);
     const signedDelta = mode === 'outbound' ? -qty : qty;
     const nextQty = currentQty + signedDelta;
-    const requiresAdmin = user?.role !== 'ADMIN';
     const negativeBlocked = nextQty < 0 && !payload.allowNegativeOverride;
-    const canExecute = !requiresAdmin && !negativeBlocked;
+    const canExecute = !negativeBlocked;
     const minWarning = item.minQty != null && nextQty <= Number(item.minQty);
     const estimatedCost = (qty * Number(item.unitPrice)).toString();
 
@@ -306,7 +304,6 @@ export default function OperationsPage() {
       unitPrice: item.unitPrice,
       estimatedCost,
       canExecute,
-      requiresAdmin,
       negativeBlocked,
       minWarning,
     };
@@ -368,10 +365,6 @@ export default function OperationsPage() {
     if (!token || !itemPreview) {
       return;
     }
-    if (user?.role !== 'ADMIN') {
-      throw new ApiError('Somente ADMIN pode movimentar item diretamente por esta tela', 403);
-    }
-
     const payload = itemOperationFormSchema.parse(itemForm);
     const sourceText = payload.source?.trim();
     const noteText = payload.note?.trim();
@@ -509,12 +502,6 @@ export default function OperationsPage() {
                 </div>
               </div>
             </div>
-
-            {target === 'item' && user?.role !== 'ADMIN' ? (
-              <div className="alert-block warn">
-                <strong>Atencao:</strong> movimentacao direta de item nesta tela usa ajuste de estoque e exige perfil ADMIN.
-              </div>
-            ) : null}
 
             <div className="form-grid">
               {target === 'product' ? (
@@ -771,12 +758,6 @@ export default function OperationsPage() {
                     <div className="small">preco atual: {formatDecimal(itemPreview.unitPrice)}</div>
                   </div>
                 </div>
-
-                {itemPreview.requiresAdmin ? (
-                  <div className="alert-block warn">
-                    <strong>Permissao necessaria:</strong> somente ADMIN pode confirmar operacao direta por item.
-                  </div>
-                ) : null}
 
                 {itemPreview.negativeBlocked ? (
                   <div className="alert-block danger">

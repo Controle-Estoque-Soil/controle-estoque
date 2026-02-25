@@ -8,7 +8,7 @@ import { useAuth } from '@/components/auth-provider';
 import { DeleteActionDialog } from '@/components/delete-action-dialog';
 import { MovementSummaryModal, type MovementSummaryRow } from '@/components/movement-summary-modal';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal, formatMovementReason } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatMovementReason, formatUserDisplayName } from '@/lib/format';
 import { itemFormSchema } from '@/lib/schemas';
 
 type ItemRecord = {
@@ -34,7 +34,7 @@ type ItemDetailResponse = {
     referenceId: string | null;
     note: string | null;
     createdAt: string;
-    createdByUser: { id: string; email: string; role: string };
+    createdByUser: { id: string; name?: string | null; email: string; role: string };
   }>;
 };
 
@@ -292,11 +292,6 @@ export default function ItemsPage() {
 
   async function removeItemQuantity(item: ItemRecord, qty: string) {
     if (!token) {
-      return;
-    }
-
-    if (user?.role !== 'ADMIN') {
-      setError('Apenas ADMIN pode remover quantidade diretamente de um item.');
       return;
     }
 
@@ -623,11 +618,10 @@ export default function ItemsPage() {
                   </div>
                 </form>
 
-                {user?.role === 'ADMIN' ? (
-                  <>
-                    <div className="separator" />
-                    <form className="grid" onSubmit={handleAdjustStock}>
-                      <h3>Ajuste manual de estoque (ADMIN)</h3>
+                <>
+                  <div className="separator" />
+                  <form className="grid" onSubmit={handleAdjustStock}>
+                    <h3>Ajuste manual de estoque</h3>
                       <div className="form-grid">
                         <div className="field">
                           <label>Delta (ex: 5 ou -2.5)</label>
@@ -641,24 +635,25 @@ export default function ItemsPage() {
                           <label>Nota</label>
                           <input className="input" value={adjustForm.note} onChange={(e) => setAdjustForm({ ...adjustForm, note: e.target.value })} />
                         </div>
-                        <div className="field full checkbox-row">
-                          <input
-                            id="allow-negative-override"
-                            type="checkbox"
-                            checked={adjustForm.allowNegativeOverride}
-                            onChange={(e) => setAdjustForm({ ...adjustForm, allowNegativeOverride: e.target.checked })}
-                          />
-                          <label htmlFor="allow-negative-override">Permitir estoque negativo (override)</label>
-                        </div>
+                        {user?.role === 'ADMIN' ? (
+                          <div className="field full checkbox-row">
+                            <input
+                              id="allow-negative-override"
+                              type="checkbox"
+                              checked={adjustForm.allowNegativeOverride}
+                              onChange={(e) => setAdjustForm({ ...adjustForm, allowNegativeOverride: e.target.checked })}
+                            />
+                            <label htmlFor="allow-negative-override">Permitir estoque negativo (override)</label>
+                          </div>
+                        ) : null}
                       </div>
                       <div className="actions">
                         <button className="button danger" type="submit" disabled={saving}>
                           Registrar ajuste
                         </button>
                       </div>
-                    </form>
-                  </>
-                ) : null}
+                  </form>
+                </>
 
                 <div className="separator" />
                 <div>
@@ -687,7 +682,7 @@ export default function ItemsPage() {
                               <td>{formatDecimal(movement.deltaQty)}</td>
                               <td>{formatMovementReason(movement.reason, movement.deltaQty)}</td>
                               <td>{movement.referenceType}{movement.referenceId ? ` / ${movement.referenceId}` : ''}</td>
-                              <td>{movement.createdByUser.email}</td>
+                              <td>{formatUserDisplayName(movement.createdByUser)}</td>
                               <td>{movement.note ?? '-'}</td>
                             </tr>
                           ))

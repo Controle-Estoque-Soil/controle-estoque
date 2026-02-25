@@ -1,6 +1,7 @@
 import type { PrismaClient, Role, User } from '@prisma/client';
 
 export interface CreateUserInput {
+  name?: string | null;
   email: string;
   passwordHash: string;
   role: Role;
@@ -28,6 +29,7 @@ export class PrismaAuthRepository implements AuthRepositoryPort {
   createUser(input: CreateUserInput): Promise<User> {
     return this.prisma.user.create({
       data: {
+        name: input.name ?? null,
         email: input.email,
         passwordHash: input.passwordHash,
         role: input.role,

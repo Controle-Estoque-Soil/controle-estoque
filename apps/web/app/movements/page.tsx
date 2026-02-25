@@ -6,7 +6,7 @@ import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { ProductOrderDetailModal } from '@/components/product-order-detail-modal';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal, formatMovementReason } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatMovementReason, formatUserDisplayName } from '@/lib/format';
 
 type ItemOption = { id: string; name: string; sku: string; unit: string };
 
@@ -24,7 +24,7 @@ type MovementRecord = {
   note: string | null;
   createdAt: string;
   item: { id: string; name: string; sku: string; unit: string };
-  createdByUser: { id: string; email: string; role: string };
+  createdByUser: { id: string; name?: string | null; email: string; role: string };
   productOrder: null | {
     id: string;
     type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
@@ -46,7 +46,7 @@ type OrderDetailRecord = {
   note: string | null;
   createdAt: string;
   product: { id: string; name: string; sku: string };
-  createdByUser: { id: string; email: string; role: string };
+  createdByUser: { id: string; name?: string | null; email: string; role: string };
   lines: Array<{
     id: string;
     itemId: string;
@@ -154,7 +154,7 @@ function shouldHideUndoneMovementRow(movement: MovementRecord): boolean {
 }
 
 export default function MovementsPage() {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const [items, setItems] = useState<ItemOption[]>([]);
   const [movements, setMovements] = useState<MovementRecord[]>([]);
   const [filters, setFilters] = useState({ itemId: '', reason: '', reference: '', from: '', to: '' });
@@ -430,7 +430,7 @@ export default function MovementsPage() {
                     const isProductRow = row.rowType === 'product' && movement.productOrder != null;
                     const isReversalRow = isProductRow ? Boolean(movement.productOrder?.isReversal) : Boolean(movement.isReversal);
                     const isAlreadyUndone = isProductRow ? Boolean(movement.productOrder?.isUndone) : Boolean(movement.isUndone);
-                    const canUndo = user?.role === 'ADMIN' && !isReversalRow && !isAlreadyUndone;
+                    const canUndo = !isReversalRow && !isAlreadyUndone;
                     return (
                       <tr
                         key={row.key}
@@ -466,7 +466,7 @@ export default function MovementsPage() {
                         </td>
                         <td>{formatMovementReason(movement.reason, movement.deltaQty)}</td>
                         <td>{movement.referenceId ?? movement.id}</td>
-                        <td>{movement.createdByUser.email}</td>
+                        <td>{formatUserDisplayName(movement.createdByUser)}</td>
                         <td>
                           {parsedNote.displayNote ?? '-'}
                           {isStandaloneItemMovement(movement) && parsedNote.displayNote ? (

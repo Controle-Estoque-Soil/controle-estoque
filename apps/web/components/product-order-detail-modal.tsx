@@ -1,6 +1,6 @@
 'use client';
 
-import { formatDateTime, formatDecimal, formatOperationType } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatOperationType, formatUserDisplayName } from '@/lib/format';
 
 type ProductOrderDetail = {
   id: string;
@@ -11,7 +11,7 @@ type ProductOrderDetail = {
   note: string | null;
   createdAt: string;
   product: { id: string; name: string; sku: string };
-  createdByUser: { id: string; email: string; role: string };
+  createdByUser: { id: string; name?: string | null; email: string; role: string };
   lines: Array<{
     id: string;
     itemId: string;
@@ -52,7 +52,7 @@ export function ProductOrderDetailModal({
             {order ? (
               <p className="small modal-subtitle">
                 {formatOperationType(order.type)} | {order.product.name} ({order.product.sku}) | qtd {formatDecimal(order.productQty)} | custo
-                total {formatDecimal(order.totalCost)} | {formatDateTime(order.createdAt)} | por {order.createdByUser.email}
+                total {formatDecimal(order.totalCost)} | {formatDateTime(order.createdAt)} | por {formatUserDisplayName(order.createdByUser)}
               </p>
             ) : null}
           </div>

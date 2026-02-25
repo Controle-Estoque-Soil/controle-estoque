@@ -19,6 +19,7 @@ class InMemoryAuthRepository implements AuthRepositoryPort {
   async createUser(input: CreateUserInput): Promise<User> {
     const user: User = {
       id: `user_${this.users.length + 1}`,
+      name: input.name ?? null,
       email: input.email,
       passwordHash: input.passwordHash,
       role: input.role,

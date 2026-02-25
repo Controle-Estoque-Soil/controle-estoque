@@ -30,6 +30,7 @@ export interface ItemMovementResponse {
   createdAt: string;
   createdByUser: {
     id: string;
+    name: string | null;
     email: string;
     role: string;
   };
@@ -88,6 +89,7 @@ function serializeMovement(movement: {
   createdAt: Date;
   createdByUser: {
     id: string;
+    name: string | null;
     email: string;
     role: string;
   };
@@ -238,6 +240,10 @@ export class ItemsService {
 
     if (deltaQty.isZero()) {
       throw appErrors.badRequest('deltaQty must not be zero');
+    }
+
+    if (input.allowNegativeOverride && actor.role !== 'ADMIN') {
+      throw appErrors.forbidden('Somente ADMIN pode usar override de estoque negativo');
     }
 
     const item = await this.itemsRepository.transaction(async (tx) => {

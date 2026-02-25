@@ -55,6 +55,7 @@ function serializeOrderDetail(order: OrderDetailRecord) {
     },
     createdByUser: {
       id: order.createdByUser.id,
+      name: order.createdByUser.name,
       email: order.createdByUser.email,
       role: order.createdByUser.role,
     },
@@ -518,6 +519,7 @@ export class OperationsService {
       },
       createdByUser: {
         id: order.createdByUser.id,
+        name: order.createdByUser.name,
         email: order.createdByUser.email,
         role: order.createdByUser.role,
       },
@@ -613,6 +615,7 @@ export class OperationsService {
       },
       createdByUser: {
         id: movement.createdByUser.id,
+        name: movement.createdByUser.name,
         email: movement.createdByUser.email,
         role: movement.createdByUser.role,
       },

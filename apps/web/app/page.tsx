@@ -6,7 +6,7 @@ import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { ProductOrderDetailModal } from '@/components/product-order-detail-modal';
 import { apiRequest, ApiError } from '@/lib/api';
-import { formatDateTime, formatDecimal } from '@/lib/format';
+import { formatDateTime, formatDecimal, formatUserDisplayName } from '@/lib/format';
 
 type ItemRecord = {
   id: string;
@@ -26,7 +26,7 @@ type OrderListRecord = {
   note: string | null;
   createdAt: string;
   product: { id: string; name: string; sku: string };
-  createdByUser: { id: string; email: string; role: string };
+  createdByUser: { id: string; name?: string | null; email: string; role: string };
   linesCount: number;
 };
 
@@ -40,7 +40,7 @@ type OrderDetailRecord = {
   note: string | null;
   createdAt: string;
   product: { id: string; name: string; sku: string };
-  createdByUser: { id: string; email: string; role: string };
+  createdByUser: { id: string; name?: string | null; email: string; role: string };
   lines: Array<{
     id: string;
     itemId: string;
@@ -188,7 +188,7 @@ export default function DashboardPage() {
                       </td>
                       <td>{formatProductOperationType(operation.type)}</td>
                       <td>{operation.linesCount}</td>
-                      <td>{operation.createdByUser.email}</td>
+                      <td>{formatUserDisplayName(operation.createdByUser)}</td>
                       <td>
                         <button
                           type="button"

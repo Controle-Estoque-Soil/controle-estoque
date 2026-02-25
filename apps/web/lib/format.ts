@@ -51,3 +51,12 @@ export function formatOperationType(type: string): string {
   return type;
 }
 
+export function formatUserDisplayName(user: { name?: string | null; email: string } | null | undefined): string {
+  if (!user) {
+    return '-';
+  }
+
+  const name = user.name?.trim();
+  return name || user.email;
+}
+

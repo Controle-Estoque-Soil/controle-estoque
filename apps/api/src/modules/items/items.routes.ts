@@ -61,7 +61,6 @@ export const itemsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post('/items/:id/adjust-stock', async (request) => {
-    fastify.requireRole(request, 'ADMIN');
     const params = parseWithSchema(itemIdParamsSchema, request.params);
     const body = parseWithSchema(stockAdjustmentBodySchema, request.body);
     const service = new ItemsService(new ItemsRepository(fastify.prisma));

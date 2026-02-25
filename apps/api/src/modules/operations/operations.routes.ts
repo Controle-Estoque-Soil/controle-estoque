@@ -79,7 +79,6 @@ export const operationsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post('/movements/:id/undo', async (request, reply) => {
-    fastify.requireRole(request, 'ADMIN');
     const params = parseWithSchema(movementIdParamsSchema, request.params);
     const service = new OperationsService(new OperationsRepository(fastify.prisma));
     const result = await service.undoMovement(params.id, request.user);
