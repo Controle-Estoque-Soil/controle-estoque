@@ -136,7 +136,13 @@ export default function OperationsPage() {
   const [selectedOrder, setSelectedOrder] = useState<OrderDetailRecord | null>(null);
   const [mode, setMode] = useState<'outbound' | 'inbound'>('outbound');
   const [target, setTarget] = useState<'product' | 'item'>('product');
-  const [productForm, setProductForm] = useState({ productId: '', qty: '', note: '', allowNegativeOverride: false });
+  const [productForm, setProductForm] = useState({
+    productId: '',
+    qty: '',
+    source: '',
+    note: '',
+    allowNegativeOverride: false,
+  });
   const [itemForm, setItemForm] = useState({ itemId: '', qty: '', source: '', note: '', allowNegativeOverride: false });
   const [productPreview, setProductPreview] = useState<ProductOperationPreviewResponse | null>(null);
   const [itemPreview, setItemPreview] = useState<ItemOperationPreview | null>(null);
@@ -321,11 +327,19 @@ export default function OperationsPage() {
     }
 
     const payload = operationFormSchema.parse(productForm);
+    const sourceText = productForm.source.trim();
+    const requestBody =
+      mode === 'inbound' && sourceText
+        ? {
+            ...payload,
+            note: [`Origem: ${sourceText}`, payload.note?.trim()].filter(Boolean).join(' | '),
+          }
+        : payload;
     const endpoint = mode === 'outbound' ? '/operations/outbound' : '/operations/inbound';
     const response = await apiRequest<{ data: OrderDetailRecord }>(endpoint, {
       method: 'POST',
       token,
-      body: payload,
+      body: requestBody,
     });
     setSuccess('Operacao registrada com sucesso.');
     setSelectedOrder(response.data);
@@ -514,6 +528,18 @@ export default function OperationsPage() {
                       onChange={(e) => setProductForm({ ...productForm, qty: e.target.value })}
                     />
                   </div>
+                  {mode === 'inbound' ? (
+                    <div className="field full">
+                      <label htmlFor="operation-product-source">Origem (link, vendedor, revenda, etc) (opcional)</label>
+                      <input
+                        id="operation-product-source"
+                        className="input"
+                        placeholder="Ex.: fornecedor X, revenda Y, https://loja.com/item..."
+                        value={productForm.source}
+                        onChange={(e) => setProductForm({ ...productForm, source: e.target.value })}
+                      />
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <>
