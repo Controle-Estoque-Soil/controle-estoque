@@ -63,6 +63,11 @@ type MovementDisplayRow = {
   movement: MovementRecord;
 };
 
+type ParsedMovementNote = {
+  displayNote: string | null;
+  sourceText: string | null;
+};
+
 function toIsoOrUndefined(value: string): string | undefined {
   if (!value) {
     return undefined;
@@ -101,6 +106,43 @@ function movementSourceLabel(movement: MovementRecord): string {
     return 'Ajuste manual';
   }
   return movement.referenceType;
+}
+
+function parseMovementNote(note: string | null): ParsedMovementNote {
+  if (!note) {
+    return { displayNote: null, sourceText: null };
+  }
+
+  const raw = note.trim().replace(/^\[ITEM_DIRETO_[A-Z_]+\]\s*/i, '').trim();
+  if (!raw) {
+    return { displayNote: null, sourceText: null };
+  }
+
+  const parts = raw
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const normalizedParts = parts.length > 0 ? parts : [raw];
+  let sourceText: string | null = null;
+  const noteParts: string[] = [];
+
+  for (const part of normalizedParts) {
+    if (/^Origem:\s*/i.test(part)) {
+      const value = part.replace(/^Origem:\s*/i, '').trim();
+      if (value && !sourceText) {
+        sourceText = value;
+      }
+      continue;
+    }
+
+    noteParts.push(part);
+  }
+
+  return {
+    displayNote: noteParts.length > 0 ? noteParts.join(' | ') : null,
+    sourceText,
+  };
 }
 
 function shouldHideUndoneMovementRow(movement: MovementRecord): boolean {
@@ -383,6 +425,7 @@ export default function MovementsPage() {
                 ) : (
                   displayRows.map((row) => {
                     const movement = row.movement;
+                    const parsedNote = parseMovementNote(movement.note);
                     const isOrderMovement = canOpenOrderDetail(movement);
                     const isProductRow = row.rowType === 'product' && movement.productOrder != null;
                     const isReversalRow = isProductRow ? Boolean(movement.productOrder?.isReversal) : Boolean(movement.isReversal);
@@ -425,15 +468,19 @@ export default function MovementsPage() {
                         <td>{movement.referenceId ?? movement.id}</td>
                         <td>{movement.createdByUser.email}</td>
                         <td>
-                          {movement.note ?? '-'}
+                          {parsedNote.displayNote ?? '-'}
                           {isStandaloneItemMovement(movement) ? (
                             <div className="small" style={{ color: '#166534' }}>Saida/entrada de item fora de produto</div>
                           ) : null}
                         </td>
                         <td>
-                          <span className={`badge ${canOpenOrderDetail(movement) ? 'ok' : isStandaloneItemMovement(movement) ? 'warn' : ''}`}>
-                            {movementSourceLabel(movement)}
-                          </span>
+                          {parsedNote.sourceText ? (
+                            parsedNote.sourceText
+                          ) : (
+                            <span className={`badge ${canOpenOrderDetail(movement) ? 'ok' : isStandaloneItemMovement(movement) ? 'warn' : ''}`}>
+                              {movementSourceLabel(movement)}
+                            </span>
+                          )}
                         </td>
                         <td>
                           {isOrderMovement ? (
