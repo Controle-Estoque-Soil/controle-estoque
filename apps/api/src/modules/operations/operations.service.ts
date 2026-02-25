@@ -430,10 +430,7 @@ export class OperationsService {
         throw appErrors.notFound('Produto da ordem nao encontrado');
       }
 
-      const nextSoldTotal = product.qtySoldTotal.sub(order.productQty);
-      if (nextSoldTotal.isNegative()) {
-        throw appErrors.conflict('Nao e possivel desfazer: contador "Ja sairam" ficaria negativo');
-      }
+      const nextSoldTotal = Prisma.Decimal.max(product.qtySoldTotal.sub(order.productQty), new Prisma.Decimal(0));
 
       await this.operationsRepository.updateProductQtyCounters(
         product.id,
