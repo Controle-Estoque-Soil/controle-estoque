@@ -44,13 +44,12 @@ test.describe.serial('stock platform e2e', () => {
     });
 
     const createItemPanel = page.locator('.panel').filter({ has: page.getByRole('heading', { name: 'Criar item' }) });
-    const createItemInputs = createItemPanel.locator('input');
-    await createItemInputs.nth(0).fill(ITEM_NAME);
-    await createItemInputs.nth(1).fill(ITEM_SKU);
-    await createItemInputs.nth(2).fill('kg');
-    await createItemInputs.nth(3).fill('10');
-    await createItemInputs.nth(4).fill('20');
-    await createItemInputs.nth(5).fill('5');
+    await createItemPanel.getByLabel('Nome').fill(ITEM_NAME);
+    await createItemPanel.getByLabel('SKU').fill(ITEM_SKU);
+    await createItemPanel.getByLabel('Unidade').fill('kg');
+    await createItemPanel.getByLabel(/Pre/).fill('10');
+    await createItemPanel.getByLabel('Qtd inicial').fill('20');
+    await createItemPanel.getByLabel(/Estoque minimo/i).fill('5');
     await createItemPanel.getByRole('button', { name: 'Criar item' }).click();
     await expect(page.getByText('Item criado com sucesso.')).toBeVisible();
     await expectItemStock(page, /20/);
