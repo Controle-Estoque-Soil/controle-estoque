@@ -5,6 +5,7 @@ export const itemFormSchema = z.object({
   sku: z.string().trim().max(80, 'SKU invalido'),
   unit: z.string().min(1, 'Unidade e obrigatoria'),
   unitPrice: z.string().regex(/^\d+(\.\d+)?$/, 'Preco invalido'),
+  purchaseLeadTimeDays: z.union([z.literal(''), z.string().regex(/^\d+(\.\d+)?$/, 'Tempo medio invalido')]).default(''),
   qtyOnHand: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invalida').default('0'),
   minQty: z.string().regex(/^\d+(\.\d+)?$/, 'Estoque minimo invalido'),
 });

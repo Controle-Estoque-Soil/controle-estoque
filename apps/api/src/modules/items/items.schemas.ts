@@ -23,6 +23,7 @@ export const itemCreateBodySchema = z.object({
   sku: optionalSkuSchema,
   unit: z.string().min(1).max(20),
   unitPrice: nonNegativeDecimalStringSchema,
+  purchaseLeadTimeDays: nonNegativeDecimalStringSchema.optional(),
   qtyOnHand: nonNegativeDecimalStringSchema.default('0'),
   minQty: nonNegativeDecimalStringSchema,
 });
@@ -35,6 +36,7 @@ export const itemUpdateBodySchema = z
     sku: optionalSkuSchema,
     unit: z.string().min(1).max(20).optional(),
     unitPrice: nonNegativeDecimalStringSchema.optional(),
+    purchaseLeadTimeDays: nonNegativeDecimalStringSchema.nullable().optional(),
     minQty: nonNegativeDecimalStringSchema.nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, 'At least one field is required');

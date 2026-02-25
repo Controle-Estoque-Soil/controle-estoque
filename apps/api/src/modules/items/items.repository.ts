@@ -8,6 +8,7 @@ export interface ItemCreateRecordInput {
   sku: string;
   unit: string;
   unitPrice: Prisma.Decimal;
+  purchaseLeadTimeDays?: Prisma.Decimal | null;
   qtyOnHand: Prisma.Decimal;
   minQty?: Prisma.Decimal | null;
 }
@@ -17,6 +18,7 @@ export interface ItemUpdateRecordInput {
   sku?: string;
   unit?: string;
   unitPrice?: Prisma.Decimal;
+  purchaseLeadTimeDays?: Prisma.Decimal | null;
   minQty?: Prisma.Decimal | null;
 }
 
@@ -101,6 +103,7 @@ export class ItemsRepository {
         sku: data.sku,
         unit: data.unit,
         unitPrice: data.unitPrice,
+        purchaseLeadTimeDays: data.purchaseLeadTimeDays ?? null,
         qtyOnHand: data.qtyOnHand,
         minQty: data.minQty ?? null,
       },

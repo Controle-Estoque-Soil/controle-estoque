@@ -16,6 +16,7 @@ type ItemRecord = {
   sku: string;
   unit: string;
   unitPrice: string;
+  purchaseLeadTimeDays: string | null;
   qtyOnHand: string;
   minQty: string | null;
   createdAt: string;
@@ -42,6 +43,7 @@ function emptyItemForm() {
     sku: '',
     unit: 'un',
     unitPrice: '0',
+    purchaseLeadTimeDays: '',
     qtyOnHand: '0',
     minQty: '',
   };
@@ -95,6 +97,7 @@ export default function ItemsPage() {
         sku: response.item.sku,
         unit: response.item.unit,
         unitPrice: response.item.unitPrice,
+        purchaseLeadTimeDays: response.item.purchaseLeadTimeDays ?? '',
         qtyOnHand: response.item.qtyOnHand,
         minQty: response.item.minQty ?? '',
       });
@@ -122,7 +125,13 @@ export default function ItemsPage() {
         method: 'POST',
         token,
         body: {
-          ...parsed,
+          name: parsed.name,
+          sku: parsed.sku,
+          unit: parsed.unit,
+          unitPrice: parsed.unitPrice,
+          purchaseLeadTimeDays: parsed.purchaseLeadTimeDays || undefined,
+          qtyOnHand: parsed.qtyOnHand,
+          minQty: parsed.minQty,
         },
       });
       setCreateForm(emptyItemForm());
@@ -158,6 +167,7 @@ export default function ItemsPage() {
           sku: parsed.sku,
           unit: parsed.unit,
           unitPrice: parsed.unitPrice,
+          purchaseLeadTimeDays: parsed.purchaseLeadTimeDays === '' ? null : parsed.purchaseLeadTimeDays,
           minQty: parsed.minQty,
         },
       });
@@ -337,6 +347,7 @@ export default function ItemsPage() {
                   <th>Unidade</th>
                   <th>Preço</th>
                   <th>Estoque</th>
+                  <th>Tempo compra (dias)</th>
                   <th>Mínimo</th>
                   <th>Ações</th>
                 </tr>
@@ -344,7 +355,7 @@ export default function ItemsPage() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7}>Nenhum item cadastrado.</td>
+                    <td colSpan={8}>Nenhum item cadastrado.</td>
                   </tr>
                 ) : (
                   items.map((item) => {
@@ -356,12 +367,11 @@ export default function ItemsPage() {
                         <td>{item.unit}</td>
                         <td>{formatDecimal(item.unitPrice)}</td>
                         <td>{formatDecimal(item.qtyOnHand)}</td>
+                        <td>{item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-'}</td>
                         <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
                         <td>
-                          {belowMin ? <span className="badge warn">Abaixo mín.</span> : null}
-                        </td>
-                        <td>
                           <div className="actions">
+                            {belowMin ? <span className="badge warn">Abaixo min.</span> : null}
                             <button type="button" className="button ghost" onClick={() => void loadDetail(item.id)}>
                               Detalhe
                             </button>
@@ -403,6 +413,15 @@ export default function ItemsPage() {
               <div className="field">
                 <label>Preço unitário</label>
                 <input className="input" value={createForm.unitPrice} onChange={(e) => setCreateForm({ ...createForm, unitPrice: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Tempo medio para compra (dias) (opcional)</label>
+                <input
+                  className="input"
+                  placeholder="Ex.: 7 ou 3.5"
+                  value={createForm.purchaseLeadTimeDays}
+                  onChange={(e) => setCreateForm({ ...createForm, purchaseLeadTimeDays: e.target.value })}
+                />
               </div>
               <div className="field">
                 <label>Qtd inicial</label>
@@ -447,6 +466,15 @@ export default function ItemsPage() {
                   <div className="field">
                     <label>Preço unitário</label>
                     <input className="input" value={editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} />
+                  </div>
+                  <div className="field">
+                    <label>Tempo medio para compra (dias) (opcional)</label>
+                    <input
+                      className="input"
+                      placeholder="Ex.: 7 ou 3.5"
+                      value={editForm.purchaseLeadTimeDays}
+                      onChange={(e) => setEditForm({ ...editForm, purchaseLeadTimeDays: e.target.value })}
+                    />
                   </div>
                   <div className="field">
                     <label>Qtd em estoque (somente leitura)</label>

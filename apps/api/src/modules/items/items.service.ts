@@ -13,6 +13,7 @@ export interface ItemResponse {
   sku: string;
   unit: string;
   unitPrice: string;
+  purchaseLeadTimeDays: string | null;
   qtyOnHand: string;
   minQty: string | null;
   createdAt: string;
@@ -57,6 +58,7 @@ function serializeItem(item: {
   sku: string;
   unit: string;
   unitPrice: Prisma.Decimal;
+  purchaseLeadTimeDays: Prisma.Decimal | null;
   qtyOnHand: Prisma.Decimal;
   minQty: Prisma.Decimal | null;
   createdAt: Date;
@@ -68,6 +70,7 @@ function serializeItem(item: {
     sku: item.sku,
     unit: item.unit,
     unitPrice: decimalToString(item.unitPrice) ?? '0',
+    purchaseLeadTimeDays: decimalToString(item.purchaseLeadTimeDays),
     qtyOnHand: decimalToString(item.qtyOnHand) ?? '0',
     minQty: decimalToString(item.minQty),
     createdAt: item.createdAt.toISOString(),
@@ -140,6 +143,7 @@ export class ItemsService {
   async create(input: ItemCreateBody, actor: JwtUserPayload): Promise<ItemResponse> {
     const qtyOnHand = toDecimal(input.qtyOnHand);
     const unitPrice = toDecimal(input.unitPrice);
+    const purchaseLeadTimeDays = input.purchaseLeadTimeDays ? toDecimal(input.purchaseLeadTimeDays) : null;
     const minQty = toDecimal(input.minQty);
 
     if (qtyOnHand.isNegative()) {
@@ -157,6 +161,7 @@ export class ItemsService {
           sku: normalizeSku(input.sku) ?? generateAutoSku('ITM'),
           unit: input.unit.trim(),
           unitPrice,
+          purchaseLeadTimeDays,
           qtyOnHand,
           minQty,
         },
@@ -194,6 +199,12 @@ export class ItemsService {
       sku: resolveItemSkuForUpdate(input.sku),
       unit: input.unit?.trim(),
       unitPrice: input.unitPrice ? toDecimal(input.unitPrice) : undefined,
+      purchaseLeadTimeDays:
+        input.purchaseLeadTimeDays === undefined
+          ? undefined
+          : input.purchaseLeadTimeDays === null
+            ? null
+            : toDecimal(input.purchaseLeadTimeDays),
       minQty:
         input.minQty === undefined
           ? undefined
