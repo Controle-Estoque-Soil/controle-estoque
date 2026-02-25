@@ -30,6 +30,7 @@ export const itemOperationFormSchema = z.object({
   qty: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invalida').refine((value) => Number(value) > 0, {
     message: 'Quantidade deve ser maior que zero',
   }),
+  source: z.string().trim().max(500, 'Origem invalida').optional(),
   note: z.string().trim().min(1, 'Nota e obrigatoria para operacao por item'),
   allowNegativeOverride: z.boolean().default(false),
 });

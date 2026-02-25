@@ -137,7 +137,7 @@ export default function OperationsPage() {
   const [mode, setMode] = useState<'outbound' | 'inbound'>('outbound');
   const [target, setTarget] = useState<'product' | 'item'>('product');
   const [productForm, setProductForm] = useState({ productId: '', qty: '', note: '', allowNegativeOverride: false });
-  const [itemForm, setItemForm] = useState({ itemId: '', qty: '', note: '', allowNegativeOverride: false });
+  const [itemForm, setItemForm] = useState({ itemId: '', qty: '', source: '', note: '', allowNegativeOverride: false });
   const [productPreview, setProductPreview] = useState<ProductOperationPreviewResponse | null>(null);
   const [itemPreview, setItemPreview] = useState<ItemOperationPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -342,12 +342,17 @@ export default function OperationsPage() {
     }
 
     const payload = itemOperationFormSchema.parse(itemForm);
+    const sourceText = payload.source?.trim();
+    const noteParts =
+      mode === 'inbound' && sourceText
+        ? [`Origem: ${sourceText}`, payload.note.trim()]
+        : [payload.note.trim()];
     await apiRequest<{ data: ItemOption }>(`/items/${payload.itemId}/adjust-stock`, {
       method: 'POST',
       token,
       body: {
         deltaQty: buildSignedDelta(mode, payload.qty),
-        note: `[ITEM_DIRETO_${mode.toUpperCase()}] ${payload.note.trim()}`,
+        note: `[ITEM_DIRETO_${mode.toUpperCase()}] ${noteParts.join(' | ')}`,
         allowNegativeOverride: payload.allowNegativeOverride,
       },
     });
@@ -543,6 +548,18 @@ export default function OperationsPage() {
                         Estoque atual: {formatDecimal(selectedItemForForm.qtyOnHand)} {selectedItemForForm.unit}
                         {selectedItemForForm.minQty ? ` | minimo: ${formatDecimal(selectedItemForForm.minQty)} ${selectedItemForForm.unit}` : ''}
                       </div>
+                    </div>
+                  ) : null}
+                  {mode === 'inbound' ? (
+                    <div className="field full">
+                      <label htmlFor="operation-item-source">Origem (link, vendedor, revenda, etc) (opcional)</label>
+                      <input
+                        id="operation-item-source"
+                        className="input"
+                        placeholder="Ex.: https://loja.com/produto, Mercado Livre, revenda X..."
+                        value={itemForm.source}
+                        onChange={(e) => setItemForm({ ...itemForm, source: e.target.value })}
+                      />
                     </div>
                   ) : null}
                 </>
