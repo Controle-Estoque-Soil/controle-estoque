@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
+import { ProductOrderDetailModal } from '@/components/product-order-detail-modal';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal, formatOperationType } from '@/lib/format';
 import { itemOperationFormSchema, operationFormSchema, productInboundSourceSchema } from '@/lib/schemas';
@@ -134,6 +135,8 @@ export default function OperationsPage() {
   const [items, setItems] = useState<ItemOption[]>([]);
   const [orders, setOrders] = useState<OrderListRecord[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderDetailRecord | null>(null);
+  const [orderDetailLoading, setOrderDetailLoading] = useState(false);
+  const [orderDetailError, setOrderDetailError] = useState<string | null>(null);
   const [mode, setMode] = useState<'outbound' | 'inbound'>('outbound');
   const [target, setTarget] = useState<'product' | 'item'>('product');
   const [productForm, setProductForm] = useState({
@@ -218,11 +221,16 @@ export default function OperationsPage() {
     if (!token) {
       return;
     }
+    setOrderDetailLoading(true);
+    setOrderDetailError(null);
+    setSelectedOrder(null);
     try {
       const response = await apiRequest<{ data: OrderDetailRecord }>(`/operations/${orderId}`, { token });
       setSelectedOrder(response.data);
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar detalhe da ordem');
+      setOrderDetailError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar detalhe da ordem');
+    } finally {
+      setOrderDetailLoading(false);
     }
   }
 
@@ -242,6 +250,12 @@ export default function OperationsPage() {
     setSuccess(null);
     setProductPreview(null);
     setItemPreview(null);
+  }
+
+  function closeOrderDetailModal() {
+    setSelectedOrder(null);
+    setOrderDetailError(null);
+    setOrderDetailLoading(false);
   }
 
   async function handleProductPreview() {
@@ -864,44 +878,16 @@ export default function OperationsPage() {
               </table>
             </div>
 
-            {selectedOrder ? (
-              <div className="grid" style={{ marginTop: '1rem' }}>
-                <div className="separator" />
-                <h3>Detalhe da ordem selecionada</h3>
-                <p className="small">
-                  {formatOperationType(selectedOrder.type)} | {selectedOrder.product.name} | {formatDateTime(selectedOrder.createdAt)} | por{' '}
-                  {selectedOrder.createdByUser.email}
-                </p>
-                <div className="table-wrap">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Item</th>
-                        <th>Qtd</th>
-                        <th>Preco snapshot</th>
-                        <th>Custo linha</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedOrder.lines.map((line) => (
-                        <tr key={line.id}>
-                          <td>
-                            {line.item.name} <span className="small">({line.item.sku})</span>
-                          </td>
-                          <td>
-                            {formatDecimal(line.itemQty)} {line.item.unit}
-                          </td>
-                          <td>{formatDecimal(line.itemUnitPriceSnapshot)}</td>
-                          <td>{formatDecimal(line.lineCost)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : null}
           </div>
         </section>
+        <ProductOrderDetailModal
+          open={orderDetailLoading || Boolean(orderDetailError) || Boolean(selectedOrder)}
+          title="Detalhe da ordem selecionada"
+          loading={orderDetailLoading}
+          error={orderDetailError}
+          order={selectedOrder}
+          onClose={closeOrderDetailModal}
+        />
       </AppShell>
     </RequireAuth>
   );

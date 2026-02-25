@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
+import { ProductOrderDetailModal } from '@/components/product-order-detail-modal';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal } from '@/lib/format';
 
@@ -116,6 +117,12 @@ export default function DashboardPage() {
     return () => controller.abort();
   }, [token]);
 
+  function closeOrderDetailModal() {
+    setSelectedOrder(null);
+    setDetailError(null);
+    setDetailLoading(false);
+  }
+
   return (
     <RequireAuth>
       <AppShell>
@@ -198,51 +205,15 @@ export default function DashboardPage() {
             </table>
           </div>
 
-          {(detailLoading || detailError || selectedOrder) ? (
-            <div className="grid" style={{ marginTop: '1rem' }}>
-              <div className="separator" />
-              <h3>Detalhes da movimentacao selecionada</h3>
-              {detailLoading ? <p className="small">Carregando itens da operacao...</p> : null}
-              {detailError ? <p className="inline-error">{detailError}</p> : null}
-              {selectedOrder ? (
-                <>
-                  <p className="small">
-                    {formatProductOperationType(selectedOrder.type)} | {selectedOrder.product.name} ({selectedOrder.product.sku}) | qtd{' '}
-                    {formatDecimal(selectedOrder.productQty)} | custo total {formatDecimal(selectedOrder.totalCost)} |{' '}
-                    {formatDateTime(selectedOrder.createdAt)}
-                  </p>
-                  <div className="table-wrap">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Item</th>
-                          <th>Qtd</th>
-                          <th>Preco snapshot</th>
-                          <th>Custo linha</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedOrder.lines.map((line) => (
-                          <tr key={line.id}>
-                            <td>
-                              {line.item.name}
-                              <div className="small">{line.item.sku}</div>
-                            </td>
-                            <td>
-                              {formatDecimal(line.itemQty)} {line.item.unit}
-                            </td>
-                            <td>{formatDecimal(line.itemUnitPriceSnapshot)}</td>
-                            <td>{formatDecimal(line.lineCost)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              ) : null}
-            </div>
-          ) : null}
         </section>
+        <ProductOrderDetailModal
+          open={detailLoading || Boolean(detailError) || Boolean(selectedOrder)}
+          title="Detalhes da movimentacao selecionada"
+          loading={detailLoading}
+          error={detailError}
+          order={selectedOrder}
+          onClose={closeOrderDetailModal}
+        />
       </AppShell>
     </RequireAuth>
   );

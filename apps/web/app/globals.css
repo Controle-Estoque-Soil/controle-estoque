@@ -530,6 +530,11 @@ a {
   gap: 0.9rem;
 }
 
+.modal-card-wide {
+  width: min(980px, 100%);
+  max-height: calc(100vh - 2rem);
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -539,6 +544,17 @@ a {
 
 .modal-header h3 {
   margin: 0;
+}
+
+.modal-subtitle {
+  margin: 0.25rem 0 0;
+}
+
+.modal-body-scroll {
+  display: grid;
+  gap: 0.75rem;
+  overflow: auto;
+  min-width: 0;
 }
 
 .segmented {
