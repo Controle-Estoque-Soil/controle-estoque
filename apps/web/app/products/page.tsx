@@ -14,6 +14,7 @@ type ProductRecord = {
   id: string;
   name: string;
   sku: string;
+  manufacturingLeadTimeDays: string | null;
   qtyInStock: string;
   qtySoldTotal: string;
   productionCapacity?: string;
@@ -50,6 +51,7 @@ function emptyProductForm() {
   return {
     name: '',
     sku: '',
+    manufacturingLeadTimeDays: '',
     qtyInStock: '0',
     qtySoldTotal: '0',
   };
@@ -115,6 +117,7 @@ export default function ProductsPage() {
       setEditForm({
         name: response.data.name,
         sku: response.data.sku,
+        manufacturingLeadTimeDays: response.data.manufacturingLeadTimeDays ?? '',
         qtyInStock: response.data.qtyInStock ?? '0',
         qtySoldTotal: response.data.qtySoldTotal ?? '0',
       });
@@ -140,7 +143,14 @@ export default function ProductsPage() {
     setSuccess(null);
     try {
       const payload = productFormSchema.parse(createForm);
-      await apiRequest<{ data: ProductRecord }>('/products', { method: 'POST', token, body: payload });
+      await apiRequest<{ data: ProductRecord }>('/products', {
+        method: 'POST',
+        token,
+        body: {
+          ...payload,
+          manufacturingLeadTimeDays: payload.manufacturingLeadTimeDays || undefined,
+        },
+      });
       setCreateForm(emptyProductForm());
       setSuccess('Produto criado com sucesso.');
       await loadProducts();
@@ -169,7 +179,11 @@ export default function ProductsPage() {
       await apiRequest<{ data: ProductRecord }>(`/products/${selectedProductId}`, {
         method: 'PUT',
         token,
-        body: payload,
+        body: {
+          ...payload,
+          manufacturingLeadTimeDays:
+            payload.manufacturingLeadTimeDays === '' ? null : payload.manufacturingLeadTimeDays,
+        },
       });
       setSuccess('Produto atualizado com sucesso.');
       await loadProducts();
@@ -432,6 +446,18 @@ export default function ProductsPage() {
                 />
               </div>
               <div className="field">
+                <label htmlFor="create-product-manufacturing-lead-time">
+                  Tempo medio de confeccao/criacao (Solda + Testes) (opcional)
+                </label>
+                <input
+                  id="create-product-manufacturing-lead-time"
+                  className="input"
+                  placeholder="Ex.: 2 ou 1.5"
+                  value={createForm.manufacturingLeadTimeDays}
+                  onChange={(e) => setCreateForm({ ...createForm, manufacturingLeadTimeDays: e.target.value })}
+                />
+              </div>
+              <div className="field">
                 <label htmlFor="create-product-qty-sold-total">Produtos ja sairam (manual)</label>
                 <input
                   id="create-product-qty-sold-total"
@@ -481,6 +507,18 @@ export default function ProductsPage() {
                       className="input"
                       value={editForm.qtyInStock}
                       onChange={(e) => setEditForm({ ...editForm, qtyInStock: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="edit-product-manufacturing-lead-time">
+                      Tempo medio de confeccao/criacao (Solda + Testes) (opcional)
+                    </label>
+                    <input
+                      id="edit-product-manufacturing-lead-time"
+                      className="input"
+                      placeholder="Ex.: 2 ou 1.5"
+                      value={editForm.manufacturingLeadTimeDays}
+                      onChange={(e) => setEditForm({ ...editForm, manufacturingLeadTimeDays: e.target.value })}
                     />
                   </div>
                   <div className="field">

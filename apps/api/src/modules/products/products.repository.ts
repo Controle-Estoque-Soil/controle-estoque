@@ -65,7 +65,13 @@ export class ProductsRepository {
   }
 
   create(
-    data: { name: string; sku: string; qtyInStock?: Prisma.Decimal; qtySoldTotal?: Prisma.Decimal },
+    data: {
+      name: string;
+      sku: string;
+      manufacturingLeadTimeDays?: Prisma.Decimal | null;
+      qtyInStock?: Prisma.Decimal;
+      qtySoldTotal?: Prisma.Decimal;
+    },
     db: DbClient = this.prisma,
   ) {
     return db.product.create({
@@ -75,7 +81,13 @@ export class ProductsRepository {
 
   update(
     id: string,
-    data: { name?: string; sku?: string; qtyInStock?: Prisma.Decimal; qtySoldTotal?: Prisma.Decimal },
+    data: {
+      name?: string;
+      sku?: string;
+      manufacturingLeadTimeDays?: Prisma.Decimal | null;
+      qtyInStock?: Prisma.Decimal;
+      qtySoldTotal?: Prisma.Decimal;
+    },
     db: DbClient = this.prisma,
   ) {
     return db.product.update({

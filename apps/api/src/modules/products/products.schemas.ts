@@ -16,6 +16,7 @@ export const productIdParamsSchema = z.object({
 export const productCreateBodySchema = z.object({
   name: z.string().min(1).max(150),
   sku: optionalSkuSchema,
+  manufacturingLeadTimeDays: nonNegativeDecimalStringSchema.optional(),
   qtyInStock: nonNegativeDecimalStringSchema.optional(),
   qtySoldTotal: nonNegativeDecimalStringSchema.optional(),
 });
@@ -26,6 +27,7 @@ export const productUpdateBodySchema = z
   .object({
     name: z.string().min(1).max(150).optional(),
     sku: optionalSkuSchema,
+    manufacturingLeadTimeDays: nonNegativeDecimalStringSchema.nullable().optional(),
     qtyInStock: nonNegativeDecimalStringSchema.optional(),
     qtySoldTotal: nonNegativeDecimalStringSchema.optional(),
   })

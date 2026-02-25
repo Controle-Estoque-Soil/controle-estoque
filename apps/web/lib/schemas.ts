@@ -13,6 +13,7 @@ export const itemFormSchema = z.object({
 export const productFormSchema = z.object({
   name: z.string().min(1, 'Nome e obrigatorio'),
   sku: z.string().trim().max(80, 'SKU invalido'),
+  manufacturingLeadTimeDays: z.union([z.literal(''), z.string().regex(/^\d+(\.\d+)?$/, 'Tempo medio invalido')]).default(''),
   qtyInStock: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade em estoque invalida').default('0'),
   qtySoldTotal: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade vendida invalida').default('0'),
 });

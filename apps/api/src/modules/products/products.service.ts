@@ -31,6 +31,7 @@ function serializeProduct(product: {
   id: string;
   name: string;
   sku: string;
+  manufacturingLeadTimeDays: Prisma.Decimal | null;
   qtyInStock: Prisma.Decimal;
   qtySoldTotal: Prisma.Decimal;
   createdAt: Date;
@@ -41,6 +42,7 @@ function serializeProduct(product: {
     id: product.id,
     name: product.name,
     sku: product.sku,
+    manufacturingLeadTimeDays: decimalToString(product.manufacturingLeadTimeDays),
     qtyInStock: decimalToString(product.qtyInStock) ?? '0',
     qtySoldTotal: decimalToString(product.qtySoldTotal) ?? '0',
     bomItemsCount: product._count?.bomItems,
@@ -168,6 +170,7 @@ export class ProductsService {
     const product = await this.productsRepository.create({
       name: input.name.trim(),
       sku: normalizeSku(input.sku) ?? generateAutoSku('PRD'),
+      manufacturingLeadTimeDays: input.manufacturingLeadTimeDays ? toDecimal(input.manufacturingLeadTimeDays) : undefined,
       qtyInStock: input.qtyInStock ? toDecimal(input.qtyInStock) : undefined,
       qtySoldTotal: input.qtySoldTotal ? toDecimal(input.qtySoldTotal) : undefined,
     });
@@ -258,6 +261,12 @@ export class ProductsService {
         {
           name: input.name?.trim(),
           sku: resolveProductSkuForUpdate(input.sku),
+          manufacturingLeadTimeDays:
+            input.manufacturingLeadTimeDays === undefined
+              ? undefined
+              : input.manufacturingLeadTimeDays === null
+                ? null
+                : toDecimal(input.manufacturingLeadTimeDays),
           qtyInStock: input.qtyInStock !== undefined ? nextQtyInStock : undefined,
           qtySoldTotal: input.qtySoldTotal !== undefined ? toDecimal(input.qtySoldTotal) : undefined,
         },
