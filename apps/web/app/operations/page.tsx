@@ -7,7 +7,7 @@ import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal, formatOperationType } from '@/lib/format';
-import { itemOperationFormSchema, operationFormSchema } from '@/lib/schemas';
+import { itemOperationFormSchema, operationFormSchema, productInboundSourceSchema } from '@/lib/schemas';
 
 type ProductOption = { id: string; name: string; sku: string };
 type ItemOption = {
@@ -250,6 +250,9 @@ export default function OperationsPage() {
     }
 
     const payload = operationFormSchema.parse(productForm);
+    if (mode === 'inbound') {
+      productInboundSourceSchema.parse(productForm.source);
+    }
     const endpoint = mode === 'outbound' ? '/operations/outbound/preview' : '/operations/inbound/preview';
     const response = await apiRequest<ProductOperationPreviewResponse>(endpoint, {
       method: 'POST',
@@ -327,7 +330,7 @@ export default function OperationsPage() {
     }
 
     const payload = operationFormSchema.parse(productForm);
-    const sourceText = productForm.source.trim();
+    const sourceText = mode === 'inbound' ? productInboundSourceSchema.parse(productForm.source) : productForm.source.trim();
     const requestBody =
       mode === 'inbound' && sourceText
         ? {
@@ -357,16 +360,15 @@ export default function OperationsPage() {
 
     const payload = itemOperationFormSchema.parse(itemForm);
     const sourceText = payload.source?.trim();
-    const noteParts =
-      mode === 'inbound' && sourceText
-        ? [`Origem: ${sourceText}`, payload.note.trim()]
-        : [payload.note.trim()];
+    const noteText = payload.note?.trim();
+    const noteParts = mode === 'inbound' && sourceText ? [`Origem: ${sourceText}`, noteText] : [noteText];
+    const noteDetails = noteParts.filter(Boolean).join(' | ');
     await apiRequest<{ data: ItemOption }>(`/items/${payload.itemId}/adjust-stock`, {
       method: 'POST',
       token,
       body: {
         deltaQty: buildSignedDelta(mode, payload.qty),
-        note: `[ITEM_DIRETO_${mode.toUpperCase()}] ${noteParts.join(' | ')}`,
+        note: noteDetails ? `[ITEM_DIRETO_${mode.toUpperCase()}] ${noteDetails}` : `[ITEM_DIRETO_${mode.toUpperCase()}]`,
         allowNegativeOverride: payload.allowNegativeOverride,
       },
     });
@@ -530,11 +532,12 @@ export default function OperationsPage() {
                   </div>
                   {mode === 'inbound' ? (
                     <div className="field full">
-                      <label htmlFor="operation-product-source">Origem (link, vendedor, revenda, etc) (opcional)</label>
+                      <label htmlFor="operation-product-source">Origem (link, vendedor, revenda, etc)</label>
                       <input
                         id="operation-product-source"
                         className="input"
                         placeholder="Ex.: fornecedor X, revenda Y, https://loja.com/item..."
+                        required
                         value={productForm.source}
                         onChange={(e) => setProductForm({ ...productForm, source: e.target.value })}
                       />
@@ -592,9 +595,7 @@ export default function OperationsPage() {
               )}
 
               <div className="field full">
-                <label htmlFor="operation-note">
-                  {target === 'item' ? 'Nota (obrigatoria para item)' : 'Nota (opcional)'}
-                </label>
+                <label htmlFor="operation-note">Nota (opcional)</label>
                 <textarea
                   id="operation-note"
                   className="textarea"

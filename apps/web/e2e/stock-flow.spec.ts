@@ -108,6 +108,7 @@ test.describe.serial('stock platform e2e', () => {
     await page.getByRole('button', { name: /Registrar entrada/ }).click();
     await page.getByLabel('Produto', { exact: true }).selectOption({ index: 1 });
     await page.getByLabel('Quantidade de produtos').fill('3');
+    await page.getByLabel(/Origem \(link, vendedor, revenda, etc\)/).fill('Fornecedor teste');
     await page.getByRole('button', { name: 'Gerar preview' }).click();
     await expect(page.getByRole('button', { name: /Confirmar/ })).toBeEnabled();
     await page.getByRole('button', { name: /Confirmar/ }).click();
