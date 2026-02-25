@@ -350,8 +350,8 @@ export default function ProductsPage() {
                   <th>Produto</th>
                   <th>SKU</th>
                   <th>Em estoque</th>
-                  <th>Ja sairam</th>
                   <th>Capacidade de producao</th>
+                  <th>Ja sairam</th>
                   <th>BOM</th>
                   <th>Ações</th>
                 </tr>
@@ -367,20 +367,19 @@ export default function ProductsPage() {
                       <td>{product.name}</td>
                       <td>{product.sku}</td>
                       <td>{formatDecimal(product.qtyInStock)}</td>
-                      <td>{formatDecimal(product.qtySoldTotal)}</td>
                       <td>
-                        <div className="actions" style={{ gap: '0.4rem' }}>
-                          <span>{formatDecimal(product.productionCapacity ?? '0')} un</span>
+                        <div className="capacity-cell">
+                          <span className="capacity-cell-value">{formatDecimal(product.productionCapacity ?? '0')} un</span>
                           <button
                             type="button"
-                            className="button ghost"
-                            style={{ padding: '0.35rem 0.6rem' }}
+                            className="capacity-cell-button"
                             onClick={() => setCapacityDialogProduct(product)}
                           >
                             Ver mais
                           </button>
                         </div>
                       </td>
+                      <td>{formatDecimal(product.qtySoldTotal)}</td>
                       <td>{product.bomItemsCount ?? 0} itens</td>
                       <td>
                         <div className="actions">
