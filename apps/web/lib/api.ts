@@ -29,13 +29,14 @@ export async function apiRequest<T>(
     signal?: AbortSignal;
   },
 ): Promise<T> {
+  const hasJsonBody = options?.body !== undefined;
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     method: options?.method ?? 'GET',
     headers: {
-      'Content-Type': 'application/json',
+      ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
       ...(options?.token ? { Authorization: `Bearer ${options.token}` } : {}),
     },
-    body: options?.body === undefined ? undefined : JSON.stringify(options.body),
+    body: hasJsonBody ? JSON.stringify(options.body) : undefined,
     signal: options?.signal,
     cache: 'no-store',
   });
