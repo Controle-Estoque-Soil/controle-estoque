@@ -296,15 +296,6 @@ export default function MovementsPage() {
                 </select>
               </div>
               <div className="field">
-                <label>Referência</label>
-                <input
-                  className="input"
-                  placeholder="Ex.: MOV-..., cmm..."
-                  value={filters.reference}
-                  onChange={(e) => setFilters({ ...filters, reference: e.target.value })}
-                />
-              </div>
-              <div className="field">
                 <label>De</label>
                 <input
                   type="datetime-local"
@@ -320,6 +311,16 @@ export default function MovementsPage() {
                   className="input"
                   value={filters.to}
                   onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+                />
+              </div>
+
+              <div className="field full">
+                <label>Referência</label>
+                <input
+                  className="input"
+                  placeholder="Ex.: MOV-..., cmm..."
+                  value={filters.reference}
+                  onChange={(e) => setFilters({ ...filters, reference: e.target.value })}
                 />
               </div>
             </div>
