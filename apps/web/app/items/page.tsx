@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { DeleteActionDialog } from '@/components/delete-action-dialog';
+import { MovementSummaryModal, type MovementSummaryRow } from '@/components/movement-summary-modal';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal, formatMovementReason } from '@/lib/format';
 import { itemFormSchema } from '@/lib/schemas';
@@ -37,6 +38,86 @@ type ItemDetailResponse = {
   }>;
 };
 
+type ItemMovementListRecord = {
+  id: string;
+  deltaQty: string;
+  referenceType: string;
+  referenceId: string | null;
+  note: string | null;
+  isReversal: boolean;
+  isUndone: boolean;
+  createdAt: string;
+};
+
+type ParsedSourceNote = {
+  sourceText: string | null;
+  displayNote: string | null;
+};
+
+function parseSourceAndNote(note: string | null): ParsedSourceNote {
+  if (!note) {
+    return { sourceText: null, displayNote: null };
+  }
+
+  const raw = note.trim().replace(/^\[ITEM_DIRETO_[A-Z_]+\]\s*/i, '').trim();
+  if (!raw) {
+    return { sourceText: null, displayNote: null };
+  }
+
+  const parts = raw
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  let sourceText: string | null = null;
+  const noteParts: string[] = [];
+
+  for (const part of (parts.length > 0 ? parts : [raw])) {
+    if (/^Origem:\s*/i.test(part)) {
+      const value = part.replace(/^Origem:\s*/i, '').trim();
+      if (value && !sourceText) {
+        sourceText = value;
+      }
+      continue;
+    }
+    noteParts.push(part);
+  }
+
+  return {
+    sourceText,
+    displayNote: noteParts.length > 0 ? noteParts.join(' | ') : null,
+  };
+}
+
+function isDirectItemOnlyMovement(movement: ItemMovementListRecord): boolean {
+  if (movement.referenceType === 'PRODUCT_ORDER') {
+    return false;
+  }
+
+  if (movement.note?.startsWith('[PRODUTO_ESTOQUE]')) {
+    return false;
+  }
+
+  if (movement.isReversal || movement.isUndone) {
+    return false;
+  }
+
+  return true;
+}
+
+function itemMovementOriginDisplay(movement: ItemMovementListRecord): { text: string; asBadge: boolean; tone?: 'warn' } {
+  const parsed = parseSourceAndNote(movement.note);
+  if (parsed.sourceText) {
+    return { text: parsed.sourceText, asBadge: false };
+  }
+
+  if (movement.note?.startsWith('[ITEM_DIRETO_')) {
+    return { text: 'Item direto', asBadge: true, tone: 'warn' };
+  }
+
+  return { text: 'Ajuste manual', asBadge: true };
+}
+
 function emptyItemForm() {
   return {
     name: '',
@@ -63,6 +144,10 @@ export default function ItemsPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ item: ItemRecord; qty: string } | null>(null);
+  const [movementDialogItem, setMovementDialogItem] = useState<ItemRecord | null>(null);
+  const [movementDialogRows, setMovementDialogRows] = useState<MovementSummaryRow[]>([]);
+  const [movementDialogLoading, setMovementDialogLoading] = useState(false);
+  const [movementDialogError, setMovementDialogError] = useState<string | null>(null);
 
   const selectedItem = useMemo(() => items.find((item) => item.id === selectedItemId) ?? null, [items, selectedItemId]);
 
@@ -315,6 +400,47 @@ export default function ItemsPage() {
     }
   }
 
+  async function openItemMovementsDialog(item: ItemRecord) {
+    if (!token) {
+      return;
+    }
+
+    setMovementDialogItem(item);
+    setMovementDialogRows([]);
+    setMovementDialogError(null);
+    setMovementDialogLoading(true);
+
+    try {
+      const response = await apiRequest<{ data: ItemMovementListRecord[] }>(`/movements?itemId=${encodeURIComponent(item.id)}`, { token });
+      const rows: MovementSummaryRow[] = response.data
+        .filter(isDirectItemOnlyMovement)
+        .map((movement) => {
+          const origin = itemMovementOriginDisplay(movement);
+          return {
+            id: movement.id,
+            date: formatDateTime(movement.createdAt),
+            reference: movement.referenceId ?? movement.id,
+            originText: origin.text,
+            originAsBadge: origin.asBadge,
+            originBadgeTone: origin.tone,
+            delta: `${formatDecimal(movement.deltaQty)} ${item.unit}`,
+          };
+        });
+      setMovementDialogRows(rows);
+    } catch (caughtError) {
+      setMovementDialogError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar movimentacoes do item');
+    } finally {
+      setMovementDialogLoading(false);
+    }
+  }
+
+  function closeItemMovementsDialog() {
+    setMovementDialogItem(null);
+    setMovementDialogRows([]);
+    setMovementDialogError(null);
+    setMovementDialogLoading(false);
+  }
+
   return (
     <RequireAuth>
       <AppShell>
@@ -349,13 +475,14 @@ export default function ItemsPage() {
                   <th>Estoque</th>
                   <th>Tempo compra (dias)</th>
                   <th>Mínimo</th>
+                  <th>Movimentacoes</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>Nenhum item cadastrado.</td>
+                    <td colSpan={9}>Nenhum item cadastrado.</td>
                   </tr>
                 ) : (
                   items.map((item) => {
@@ -369,6 +496,11 @@ export default function ItemsPage() {
                         <td>{formatDecimal(item.qtyOnHand)}</td>
                         <td>{item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-'}</td>
                         <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
+                        <td>
+                          <button type="button" className="button ghost compact" onClick={() => void openItemMovementsDialog(item)}>
+                            Movimentacoes
+                          </button>
+                        </td>
                         <td>
                           <div className="actions">
                             {belowMin ? <span className="badge warn">Abaixo min.</span> : null}
@@ -587,6 +719,18 @@ export default function ItemsPage() {
           }
           onConfirmQuantity={handleDeleteDialogQuantity}
           onConfirmDeleteAll={handleDeleteDialogAll}
+        />
+        <MovementSummaryModal
+          open={movementDialogItem != null}
+          title="Movimentacoes do item"
+          subtitle={
+            movementDialogItem ? `${movementDialogItem.name} (${movementDialogItem.sku}) - somente movimentacoes diretas do item` : null
+          }
+          loading={movementDialogLoading}
+          error={movementDialogError}
+          rows={movementDialogRows}
+          emptyMessage="Nenhuma movimentacao direta deste item encontrada."
+          onClose={closeItemMovementsDialog}
         />
       </AppShell>
     </RequireAuth>

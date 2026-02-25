@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { DeleteActionDialog } from '@/components/delete-action-dialog';
+import { MovementSummaryModal, type MovementSummaryRow } from '@/components/movement-summary-modal';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDecimal } from '@/lib/format';
 import { bomLineSchema, productFormSchema } from '@/lib/schemas';
@@ -47,6 +48,41 @@ type ProductDetailResponse = {
 
 type BomFormLine = { itemId: string; qtyRequired: string };
 
+type ProductOperationSummaryRecord = {
+  id: string;
+  type: 'INBOUND_PRODUCT' | 'OUTBOUND_PRODUCT';
+  productQty: string;
+  createdAt: string;
+  note: string | null;
+};
+
+type ParsedSourceNote = {
+  sourceText: string | null;
+};
+
+function parseSourceAndNote(note: string | null): ParsedSourceNote {
+  if (!note) {
+    return { sourceText: null };
+  }
+
+  const parts = note
+    .trim()
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  for (const part of parts.length > 0 ? parts : [note.trim()]) {
+    if (/^Origem:\s*/i.test(part)) {
+      const sourceText = part.replace(/^Origem:\s*/i, '').trim();
+      if (sourceText) {
+        return { sourceText };
+      }
+    }
+  }
+
+  return { sourceText: null };
+}
+
 function emptyProductForm() {
   return {
     name: '',
@@ -73,6 +109,10 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ product: ProductRecord; qty: string } | null>(null);
   const [capacityDialogProduct, setCapacityDialogProduct] = useState<ProductRecord | null>(null);
+  const [movementDialogProduct, setMovementDialogProduct] = useState<ProductRecord | null>(null);
+  const [movementDialogRows, setMovementDialogRows] = useState<MovementSummaryRow[]>([]);
+  const [movementDialogLoading, setMovementDialogLoading] = useState(false);
+  const [movementDialogError, setMovementDialogError] = useState<string | null>(null);
 
   const bomItemOptions = useMemo(() => items, [items]);
 
@@ -266,6 +306,51 @@ export default function ProductsPage() {
     setCapacityDialogProduct(null);
   }
 
+  async function openProductMovementsDialog(product: ProductRecord) {
+    if (!token) {
+      return;
+    }
+
+    setMovementDialogProduct(product);
+    setMovementDialogRows([]);
+    setMovementDialogError(null);
+    setMovementDialogLoading(true);
+
+    try {
+      const response = await apiRequest<{ data: ProductOperationSummaryRecord[] }>(
+        `/operations?productId=${encodeURIComponent(product.id)}`,
+        { token },
+      );
+
+      const rows: MovementSummaryRow[] = response.data.map((operation) => {
+        const parsed = parseSourceAndNote(operation.note);
+        const deltaSign = operation.type === 'OUTBOUND_PRODUCT' ? '-' : '+';
+        return {
+          id: operation.id,
+          date: new Date(operation.createdAt).toLocaleString('pt-BR'),
+          reference: operation.id,
+          originText: parsed.sourceText ?? 'Produto',
+          originAsBadge: !parsed.sourceText,
+          originBadgeTone: !parsed.sourceText ? 'ok' : undefined,
+          delta: `${deltaSign}${formatDecimal(operation.productQty)} un`,
+        };
+      });
+
+      setMovementDialogRows(rows);
+    } catch (caughtError) {
+      setMovementDialogError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar movimentacoes do produto');
+    } finally {
+      setMovementDialogLoading(false);
+    }
+  }
+
+  function closeProductMovementsDialog() {
+    setMovementDialogProduct(null);
+    setMovementDialogRows([]);
+    setMovementDialogError(null);
+    setMovementDialogLoading(false);
+  }
+
   async function handleDeleteDialogQuantity() {
     if (!deleteDialog) {
       return;
@@ -367,13 +452,14 @@ export default function ProductsPage() {
                   <th>Capacidade de producao</th>
                   <th>Ja sairam</th>
                   <th>BOM</th>
+                  <th>Movimentacoes</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={7}>Nenhum produto cadastrado.</td>
+                    <td colSpan={8}>Nenhum produto cadastrado.</td>
                   </tr>
                 ) : (
                   products.map((product) => (
@@ -395,6 +481,15 @@ export default function ProductsPage() {
                       </td>
                       <td>{formatDecimal(product.qtySoldTotal)}</td>
                       <td>{product.bomItemsCount ?? 0} itens</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="button ghost compact"
+                          onClick={() => void openProductMovementsDialog(product)}
+                        >
+                          Movimentacoes
+                        </button>
+                      </td>
                       <td>
                         <div className="actions">
                           <button type="button" className="button ghost" onClick={() => void loadDetail(product.id)}>
@@ -653,6 +748,16 @@ export default function ProductsPage() {
           }
           onConfirmQuantity={handleDeleteDialogQuantity}
           onConfirmDeleteAll={handleDeleteDialogAll}
+        />
+        <MovementSummaryModal
+          open={movementDialogProduct != null}
+          title="Movimentacoes do produto"
+          subtitle={movementDialogProduct ? `${movementDialogProduct.name} (${movementDialogProduct.sku})` : null}
+          loading={movementDialogLoading}
+          error={movementDialogError}
+          rows={movementDialogRows}
+          emptyMessage="Nenhuma movimentacao de produto encontrada."
+          onClose={closeProductMovementsDialog}
         />
         {capacityDialogProduct ? (
           <div className="modal-overlay" role="presentation" onClick={closeCapacityDialog}>
