@@ -40,7 +40,7 @@ export const productsRoutes: FastifyPluginAsync = async (fastify) => {
     const body = parseWithSchema(productUpdateBodySchema, request.body);
     const service = new ProductsService(new ProductsRepository(fastify.prisma));
     return {
-      data: await service.update(params.id, body),
+      data: await service.update(params.id, body, request.user),
     };
   });
 

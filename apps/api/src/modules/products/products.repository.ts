@@ -36,8 +36,8 @@ export class ProductsRepository {
     });
   }
 
-  getByIdWithBom(id: string) {
-    return this.prisma.product.findUnique({
+  getByIdWithBom(id: string, db: DbClient = this.prisma) {
+    return db.product.findUnique({
       where: { id },
       include: {
         bomItems: {

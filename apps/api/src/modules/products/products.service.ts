@@ -1,6 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { appErrors } from '../../core/app-error';
+import type { JwtUserPayload } from '../../types/auth';
 import { decimalToString, toDecimal } from '../../utils/decimal';
 import type { ProductBomReplaceBody, ProductCreateBody, ProductListQuery, ProductUpdateBody } from './products.schemas';
 import { ProductsRepository } from './products.repository';
@@ -20,6 +21,10 @@ function resolveProductSkuForUpdate(sku?: string | null): string | undefined {
 
 function generateAutoSku(prefix: 'PRD'): string {
   return `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+}
+
+function buildMovementReferenceCandidate(): string {
+  return `MOV-${createHash('sha256').update(randomUUID()).digest('hex').slice(0, 16).toUpperCase()}`;
 }
 
 function serializeProduct(product: {
@@ -46,6 +51,22 @@ function serializeProduct(product: {
 
 export class ProductsService {
   constructor(private readonly productsRepository: ProductsRepository) {}
+
+  private async generateUniqueMovementReferenceId(tx: Prisma.TransactionClient): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = buildMovementReferenceCandidate();
+      const existing = await tx.stockMovement.findFirst({
+        where: { referenceId: candidate },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+    }
+
+    throw new Error('Failed to generate unique stock movement reference id');
+  }
 
   async list(query: ProductListQuery) {
     const products = await this.productsRepository.list({
@@ -91,17 +112,94 @@ export class ProductsService {
     return serializeProduct(product);
   }
 
-  async update(id: string, input: ProductUpdateBody) {
-    const existing = await this.productsRepository.getById(id);
-    if (!existing) {
-      throw appErrors.notFound('Product not found');
-    }
+  async update(id: string, input: ProductUpdateBody, actor: JwtUserPayload) {
+    const product = await this.productsRepository.transaction(async (tx) => {
+      const existing = await tx.product.findUnique({
+        where: { id },
+      });
 
-    const product = await this.productsRepository.update(id, {
-      name: input.name?.trim(),
-      sku: resolveProductSkuForUpdate(input.sku),
-      qtyInStock: input.qtyInStock !== undefined ? toDecimal(input.qtyInStock) : undefined,
-      qtySoldTotal: input.qtySoldTotal !== undefined ? toDecimal(input.qtySoldTotal) : undefined,
+      if (!existing) {
+        throw appErrors.notFound('Product not found');
+      }
+
+      const nextQtyInStock = input.qtyInStock !== undefined ? toDecimal(input.qtyInStock) : existing.qtyInStock;
+      const qtyStockIncrease = nextQtyInStock.gt(existing.qtyInStock) ? nextQtyInStock.sub(existing.qtyInStock) : new Prisma.Decimal(0);
+
+      if (qtyStockIncrease.gt(0)) {
+        const productWithBom = await this.productsRepository.getByIdWithBom(id, tx);
+        if (!productWithBom) {
+          throw appErrors.notFound('Product not found');
+        }
+
+        if (productWithBom.bomItems.length === 0) {
+          throw appErrors.badRequest(
+            'Nao e possivel aumentar estoque de produto sem BOM. Cadastre a BOM antes de informar quantidade em estoque.',
+          );
+        }
+
+        const itemIds = productWithBom.bomItems.map((bomItem) => bomItem.itemId).sort();
+        await tx.$queryRaw`SELECT id FROM "items" WHERE id IN (${Prisma.join(itemIds)}) FOR UPDATE`;
+
+        const currentItems = await tx.item.findMany({
+          where: { id: { in: itemIds } },
+        });
+        const currentItemsMap = new Map(currentItems.map((item) => [item.id, item]));
+
+        if (currentItems.length !== itemIds.length) {
+          throw appErrors.badRequest('BOM references missing item(s)');
+        }
+
+        const movementReferenceId = await this.generateUniqueMovementReferenceId(tx);
+        const stockMovementRows: Prisma.StockMovementCreateManyInput[] = [];
+
+        for (const bomItem of productWithBom.bomItems) {
+          const item = currentItemsMap.get(bomItem.itemId);
+          if (!item) {
+            throw appErrors.badRequest('BOM references missing item(s)');
+          }
+
+          const consumeQty = bomItem.qtyRequired.mul(qtyStockIncrease);
+          const nextItemQty = item.qtyOnHand.sub(consumeQty);
+
+          if (nextItemQty.isNegative()) {
+            throw appErrors.conflict(
+              `Estoque insuficiente para aumentar estoque do produto. Item: ${item.name} (disponivel ${decimalToString(item.qtyOnHand) ?? '0'})`,
+            );
+          }
+
+          await tx.item.update({
+            where: { id: item.id },
+            data: { qtyOnHand: nextItemQty },
+          });
+
+          stockMovementRows.push({
+            itemId: item.id,
+            deltaQty: consumeQty.neg(),
+            reason: 'MANUAL_ADJUSTMENT',
+            referenceType: 'MANUAL_ADJUSTMENT',
+            referenceId: movementReferenceId,
+            note: `[PRODUTO_ESTOQUE] Consumo automatico por aumento de estoque do produto "${productWithBom.name}" (+${decimalToString(qtyStockIncrease) ?? '0'} un)`,
+            createdByUserId: actor.sub,
+          });
+        }
+
+        if (stockMovementRows.length > 0) {
+          await tx.stockMovement.createMany({
+            data: stockMovementRows,
+          });
+        }
+      }
+
+      return this.productsRepository.update(
+        id,
+        {
+          name: input.name?.trim(),
+          sku: resolveProductSkuForUpdate(input.sku),
+          qtyInStock: input.qtyInStock !== undefined ? nextQtyInStock : undefined,
+          qtySoldTotal: input.qtySoldTotal !== undefined ? toDecimal(input.qtySoldTotal) : undefined,
+        },
+        tx,
+      );
     });
 
     return serializeProduct(product);
