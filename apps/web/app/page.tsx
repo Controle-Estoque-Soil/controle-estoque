@@ -67,6 +67,16 @@ function formatProductOperationType(type: OrderListRecord['type'] | OrderDetailR
   return type === 'OUTBOUND_PRODUCT' ? 'Saida de produto' : 'Chegada de produto';
 }
 
+function slugifyForFileName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
 export default function DashboardPage() {
   const { token } = useAuth();
   const [items, setItems] = useState<ItemRecord[]>([]);
@@ -79,6 +89,7 @@ export default function DashboardPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generatingSummaryPdf, setGeneratingSummaryPdf] = useState(false);
 
   async function loadOrderDetail(orderId: string) {
     if (!token) {
@@ -141,6 +152,167 @@ export default function DashboardPage() {
     setDetailLoading(false);
   }
 
+  async function handleGenerateDashboardSummaryPdf() {
+    setGeneratingSummaryPdf(true);
+    setError(null);
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 36;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+      const generatedAt = formatDateTime(new Date().toISOString());
+
+      const ensureSpace = (requiredHeight: number) => {
+        if (y + requiredHeight <= pageHeight - margin) {
+          return;
+        }
+        doc.addPage();
+        y = margin;
+      };
+
+      const drawSectionTitle = (title: string) => {
+        ensureSpace(28);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(17, 24, 39);
+        doc.text(title, margin, y);
+        y += 16;
+      };
+
+      const drawSimpleTable = (headers: string[], rows: string[][], columnRatios: number[]) => {
+        const paddingX = 6;
+        const paddingY = 6;
+        const headerFontSize = 8;
+        const bodyFontSize = 8;
+        const totalRatio = columnRatios.reduce((sum, ratio) => sum + ratio, 0);
+        const colWidths = columnRatios.map((ratio) => (contentWidth * ratio) / totalRatio);
+
+        ensureSpace(34);
+        doc.setDrawColor(193, 216, 199);
+        doc.setFillColor(245, 250, 246);
+
+        const headerHeight = 24;
+        let x = margin;
+        headers.forEach((header, index) => {
+          doc.rect(x, y, colWidths[index] ?? 0, headerHeight, 'FD');
+          x += colWidths[index] ?? 0;
+        });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(headerFontSize);
+        x = margin;
+        headers.forEach((header, index) => {
+          doc.text(header, x + paddingX, y + 15);
+          x += colWidths[index] ?? 0;
+        });
+        y += headerHeight;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(bodyFontSize);
+        rows.forEach((row) => {
+          const cellLines = row.map((cell, index) =>
+            doc.splitTextToSize(String(cell || '-'), (colWidths[index] ?? 0) - paddingX * 2) as string[],
+          );
+          const linesCount = Math.max(...cellLines.map((lines) => lines.length), 1);
+          const rowHeight = linesCount * (bodyFontSize + 2) + paddingY * 2;
+          ensureSpace(rowHeight + 2);
+
+          let rowX = margin;
+          row.forEach((_, index) => {
+            doc.rect(rowX, y, colWidths[index] ?? 0, rowHeight);
+            rowX += colWidths[index] ?? 0;
+          });
+
+          rowX = margin;
+          row.forEach((_, index) => {
+            doc.text(cellLines[index] ?? ['-'], rowX + paddingX, y + paddingY + bodyFontSize);
+            rowX += colWidths[index] ?? 0;
+          });
+          y += rowHeight;
+        });
+      };
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(17, 24, 39);
+      doc.text('Resumo do dashboard - estoque', margin, y);
+      y += 24;
+
+      doc.setDrawColor(193, 216, 199);
+      doc.setFillColor(245, 250, 246);
+      doc.roundedRect(margin, y, contentWidth, 34, 8, 8, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(22, 101, 52);
+      doc.text('GERADO EM', margin + 10, y + 13);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(17, 24, 39);
+      doc.text(generatedAt, margin + 10, y + 27);
+      y += 48;
+
+      drawSectionTitle('Itens / Materia-prima');
+      drawSimpleTable(
+        ['Nome', 'SKU', 'Unidade', 'Preco medio', 'Estoque', 'Tempo compra', 'Minimo'],
+        items.length > 0
+          ? items.map((item) => [
+              item.name,
+              item.sku,
+              item.unit,
+              formatDecimal(item.unitPrice),
+              formatDecimal(item.qtyOnHand),
+              item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-',
+              item.minQty ? formatDecimal(item.minQty) : '-',
+            ])
+          : [['Nenhum item cadastrado.', '', '', '', '', '', '']],
+        [2.2, 1.8, 0.9, 1.1, 1.0, 1.2, 0.9],
+      );
+      y += 16;
+
+      drawSectionTitle('Produtos intermediarios');
+      drawSimpleTable(
+        ['Nome', 'SKU', 'Estoque', 'Capacidade de producao atual', 'Ja sairam'],
+        intermediateProducts.length > 0
+          ? intermediateProducts.map((product) => [
+              product.name,
+              product.sku,
+              formatDecimal(product.qtyInStock),
+              formatDecimal(product.productionCapacity ?? '0'),
+              formatDecimal(product.qtySoldTotal),
+            ])
+          : [['Nenhum produto intermediario cadastrado.', '', '', '', '']],
+        [2.1, 1.8, 1.0, 2.1, 1.0],
+      );
+      y += 16;
+
+      drawSectionTitle('Produtos finais');
+      drawSimpleTable(
+        ['Nome', 'SKU', 'Estoque', 'Capacidade de producao atual', 'Ja sairam'],
+        products.length > 0
+          ? products.map((product) => [
+              product.name,
+              product.sku,
+              formatDecimal(product.qtyInStock),
+              formatDecimal(product.productionCapacity ?? '0'),
+              formatDecimal(product.qtySoldTotal),
+            ])
+          : [['Nenhum produto cadastrado.', '', '', '', '']],
+        [2.1, 1.8, 1.0, 2.1, 1.0],
+      );
+
+      const fileStamp = new Date().toISOString().replace(/[:.]/g, '-');
+      doc.save(`dashboard-resumo-${slugifyForFileName(generatedAt) || 'gerado'}-${fileStamp}.pdf`);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? `Falha ao gerar PDF: ${caughtError.message}` : 'Falha ao gerar PDF');
+    } finally {
+      setGeneratingSummaryPdf(false);
+    }
+  }
+
   return (
     <RequireAuth>
       <AppShell>
@@ -170,8 +342,22 @@ export default function DashboardPage() {
         </section>
 
         <section className="panel">
-          <h2>Resumo das tabelas</h2>
-          <p className="small">Visao resumida de Itens, Produtos intermediarios e Produtos finais.</p>
+          <div className="page-header">
+            <div>
+              <h2>Resumo das tabelas</h2>
+              <p className="small">Visao resumida de Itens, Produtos intermediarios e Produtos finais.</p>
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="button ghost"
+                onClick={() => void handleGenerateDashboardSummaryPdf()}
+                disabled={generatingSummaryPdf}
+              >
+                {generatingSummaryPdf ? 'Gerando PDF...' : 'Gerar PDF resumo'}
+              </button>
+            </div>
+          </div>
 
           <div className="grid" style={{ gap: '1rem' }}>
             <div>
