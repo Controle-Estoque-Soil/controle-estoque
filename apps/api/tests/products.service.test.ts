@@ -360,4 +360,71 @@ describe('ProductsService.update (manual qtyInStock)', () => {
     expect(itemUpdateCalls[0]?.[0]?.data?.qtyOnHand.toString()).toBe('76');
     expect(tx.stockMovement.createMany).toHaveBeenCalled();
   });
+
+  it('returns BOM items when decreasing stock of intermediate product', async () => {
+    const productWithBom = buildProductForUpdate({
+      kind: 'INTERMEDIATE',
+      bomItems: [{ itemId: 'item_chip', qtyRequired: '2', itemName: 'Chip TIM' }],
+    });
+
+    const { service, tx } = buildUpdateHarness({
+      existingKind: 'INTERMEDIATE',
+      existingQtyInStock: '2',
+      productWithBom,
+      currentItems: [{ id: 'item_chip', name: 'Chip TIM', qtyOnHand: '6' }],
+    });
+
+    const actor: JwtUserPayload = { sub: 'user_1', email: 'user@example.com', role: 'ADMIN' };
+    await service.update('prod_1', { qtyInStock: '0' }, actor, 'INTERMEDIATE');
+
+    const itemUpdateCalls = (
+      tx.item.update as unknown as {
+        mock: { calls: Array<Array<{ where: { id: string }; data: { qtyOnHand: Prisma.Decimal } }>> };
+      }
+    ).mock.calls;
+    expect(itemUpdateCalls[0]?.[0]?.where?.id).toBe('item_chip');
+    expect(itemUpdateCalls[0]?.[0]?.data?.qtyOnHand.toString()).toBe('10');
+
+    const movementCreateManyCalls = (
+      tx.stockMovement.createMany as unknown as { mock: { calls: Array<Array<{ data: Array<{ deltaQty: Prisma.Decimal; note: string }> }>> } }
+    ).mock.calls;
+    expect(movementCreateManyCalls[0]?.[0]?.data?.[0]?.deltaQty.toString()).toBe('4');
+    expect(movementCreateManyCalls[0]?.[0]?.data?.[0]?.note).toContain('Devolucao automatica');
+  });
+
+  it('returns nested intermediate BOM items when decreasing stock of final product partially', async () => {
+    const productWithBom = buildProductForUpdate({
+      kind: 'FINAL',
+      bomIntermediateProducts: [
+        {
+          intermediateProductId: 'int_1',
+          qtyRequired: '2',
+          intermediateProduct: {
+            id: 'int_1',
+            name: 'Modem',
+            sku: 'INT-1',
+            bomItems: [{ itemId: 'item_modem_chip', qtyRequired: '3', itemName: 'Chip de modem' }],
+          },
+        },
+      ],
+    });
+
+    const { service, tx } = buildUpdateHarness({
+      existingKind: 'FINAL',
+      existingQtyInStock: '2',
+      productWithBom,
+      currentItems: [{ id: 'item_modem_chip', name: 'Chip de modem', qtyOnHand: '10' }],
+    });
+
+    const actor: JwtUserPayload = { sub: 'user_1', email: 'user@example.com', role: 'ADMIN' };
+    await service.update('prod_1', { qtyInStock: '1' }, actor, 'FINAL');
+
+    const itemUpdateCalls = (
+      tx.item.update as unknown as {
+        mock: { calls: Array<Array<{ where: { id: string }; data: { qtyOnHand: Prisma.Decimal } }>> };
+      }
+    ).mock.calls;
+    expect(itemUpdateCalls[0]?.[0]?.where?.id).toBe('item_modem_chip');
+    expect(itemUpdateCalls[0]?.[0]?.data?.qtyOnHand.toString()).toBe('16');
+  });
 });

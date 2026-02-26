@@ -298,24 +298,27 @@ function computeProductionCapacity(product: ProductForCapacity) {
   };
 }
 
-async function consumeItemsForManualStockIncrease(params: {
+async function syncItemsForManualStockChange(params: {
   tx: Prisma.TransactionClient;
   generateUniqueMovementReferenceId: (tx: Prisma.TransactionClient) => Promise<string>;
   product: ProductWithBomForStockConsumption;
-  qtyStockIncrease: Prisma.Decimal;
+  qtyStockDelta: Prisma.Decimal;
   actorSub: string;
 }) {
-  const { tx, product, qtyStockIncrease, actorSub, generateUniqueMovementReferenceId } = params;
+  const { tx, product, qtyStockDelta, actorSub, generateUniqueMovementReferenceId } = params;
 
-  if (qtyStockIncrease.lte(0)) {
+  if (qtyStockDelta.eq(0)) {
     return;
   }
 
   const noComponents = product.bomItems.length === 0 && product.bomIntermediateProducts.length === 0;
   if (noComponents) {
-    throw appErrors.badRequest(
-      'Nao e possivel aumentar estoque de produto sem BOM. Cadastre a BOM antes de informar quantidade em estoque.',
-    );
+    if (qtyStockDelta.gt(0)) {
+      throw appErrors.badRequest(
+        'Nao e possivel aumentar estoque de produto sem BOM. Cadastre a BOM antes de informar quantidade em estoque.',
+      );
+    }
+    return;
   }
 
   const flattened = flattenProductBom(product);
@@ -344,8 +347,8 @@ async function consumeItemsForManualStockIncrease(params: {
       throw appErrors.badRequest('BOM references missing item(s)');
     }
 
-    const consumeQty = flattenedLine.qtyRequiredPerProduct.mul(qtyStockIncrease);
-    const nextItemQty = item.qtyOnHand.sub(consumeQty);
+    const itemDeltaQty = flattenedLine.qtyRequiredPerProduct.mul(qtyStockDelta).neg();
+    const nextItemQty = item.qtyOnHand.add(itemDeltaQty);
 
     if (nextItemQty.isNegative()) {
       throw appErrors.conflict(
@@ -360,11 +363,14 @@ async function consumeItemsForManualStockIncrease(params: {
 
     stockMovementRows.push({
       itemId: item.id,
-      deltaQty: consumeQty.neg(),
+      deltaQty: itemDeltaQty,
       reason: 'MANUAL_ADJUSTMENT',
       referenceType: 'MANUAL_ADJUSTMENT',
       referenceId: movementReferenceId,
-      note: `[PRODUTO_ESTOQUE] Consumo automatico por aumento de estoque do ${getProductKindLabel(product.kind)} "${product.name}" (+${decimalToString(qtyStockIncrease) ?? '0'} un)`,
+      note:
+        qtyStockDelta.gt(0)
+          ? `[PRODUTO_ESTOQUE] Consumo automatico por aumento de estoque do ${getProductKindLabel(product.kind)} "${product.name}" (+${decimalToString(qtyStockDelta) ?? '0'} un)`
+          : `[PRODUTO_ESTOQUE] Devolucao automatica por reducao de estoque do ${getProductKindLabel(product.kind)} "${product.name}" (-${decimalToString(qtyStockDelta.abs()) ?? '0'} un)`,
       createdByUserId: actorSub,
     });
   }
@@ -476,21 +482,19 @@ export class ProductsService {
       ensureExpectedKind(existing, expectedKind);
 
       const nextQtyInStock = input.qtyInStock !== undefined ? toDecimal(input.qtyInStock) : existing.qtyInStock;
-      const qtyStockIncrease = nextQtyInStock.gt(existing.qtyInStock)
-        ? nextQtyInStock.sub(existing.qtyInStock)
-        : new Prisma.Decimal(0);
+      const qtyStockDelta = nextQtyInStock.sub(existing.qtyInStock);
 
-      if (qtyStockIncrease.gt(0)) {
+      if (!qtyStockDelta.eq(0)) {
         const productWithBom = await this.productsRepository.getByIdWithBom(id, tx);
         if (!productWithBom) {
           throw appErrors.notFound('Product not found');
         }
         ensureExpectedKind(productWithBom, expectedKind);
-        await consumeItemsForManualStockIncrease({
+        await syncItemsForManualStockChange({
           tx,
           generateUniqueMovementReferenceId: (client) => this.generateUniqueMovementReferenceId(client),
           product: productWithBom,
-          qtyStockIncrease,
+          qtyStockDelta,
           actorSub: actor.sub,
         });
       }
