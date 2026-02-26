@@ -13,8 +13,20 @@ type ItemRecord = {
   name: string;
   sku: string;
   unit: string;
+  unitPrice: string;
+  purchaseLeadTimeDays: string | null;
   qtyOnHand: string;
   minQty: string | null;
+};
+
+type ProductSummaryRecord = {
+  id: string;
+  kind?: 'FINAL' | 'INTERMEDIATE';
+  name: string;
+  sku: string;
+  qtyInStock: string;
+  qtySoldTotal: string;
+  productionCapacity?: string;
 };
 
 type OrderListRecord = {
@@ -59,6 +71,8 @@ export default function DashboardPage() {
   const { token } = useAuth();
   const [items, setItems] = useState<ItemRecord[]>([]);
   const [belowMin, setBelowMin] = useState<ItemRecord[]>([]);
+  const [products, setProducts] = useState<ProductSummaryRecord[]>([]);
+  const [intermediateProducts, setIntermediateProducts] = useState<ProductSummaryRecord[]>([]);
   const [recentOperations, setRecentOperations] = useState<OrderListRecord[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderDetailRecord | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -96,11 +110,15 @@ export default function DashboardPage() {
     Promise.all([
       apiRequest<{ data: ItemRecord[] }>('/items', { token, signal: controller.signal }),
       apiRequest<{ data: ItemRecord[] }>('/items?belowMin=true', { token, signal: controller.signal }),
+      apiRequest<{ data: ProductSummaryRecord[] }>('/products', { token, signal: controller.signal }),
+      apiRequest<{ data: ProductSummaryRecord[] }>('/intermediate-products', { token, signal: controller.signal }),
       apiRequest<{ data: OrderListRecord[] }>('/operations', { token, signal: controller.signal }),
     ])
-      .then(([itemsResponse, belowMinResponse, operationsResponse]) => {
+      .then(([itemsResponse, belowMinResponse, productsResponse, intermediateProductsResponse, operationsResponse]) => {
         setItems(itemsResponse.data);
         setBelowMin(belowMinResponse.data);
+        setProducts(productsResponse.data);
+        setIntermediateProducts(intermediateProductsResponse.data);
         setRecentOperations(operationsResponse.data.slice(0, 10));
       })
       .catch((caughtError) => {
@@ -147,6 +165,119 @@ export default function DashboardPage() {
             <div className="kpi-card">
               <div className="card-value">{recentOperations.length}</div>
               <div className="card-label">Ultimas operacoes de produto</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="panel">
+          <h2>Resumo das tabelas</h2>
+          <p className="small">Visao resumida de Itens, Produtos intermediarios e Produtos finais.</p>
+
+          <div className="grid" style={{ gap: '1rem' }}>
+            <div>
+              <h3>Itens / Materia-prima</h3>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>SKU</th>
+                      <th>Unidade</th>
+                      <th>Preco medio</th>
+                      <th>Estoque</th>
+                      <th>Tempo compra</th>
+                      <th>Minimo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.length === 0 ? (
+                      <tr>
+                        <td colSpan={7}>Nenhum item cadastrado.</td>
+                      </tr>
+                    ) : (
+                      items.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.name}</td>
+                          <td>{item.sku}</td>
+                          <td>{item.unit}</td>
+                          <td>{formatDecimal(item.unitPrice)}</td>
+                          <td>{formatDecimal(item.qtyOnHand)}</td>
+                          <td>{item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-'}</td>
+                          <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3>Produtos intermediarios</h3>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>SKU</th>
+                      <th>Estoque</th>
+                      <th>Capacidade de producao atual</th>
+                      <th>Ja sairam</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {intermediateProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={5}>Nenhum produto intermediario cadastrado.</td>
+                      </tr>
+                    ) : (
+                      intermediateProducts.map((product) => (
+                        <tr key={product.id}>
+                          <td>{product.name}</td>
+                          <td>{product.sku}</td>
+                          <td>{formatDecimal(product.qtyInStock)}</td>
+                          <td>{formatDecimal(product.productionCapacity ?? '0')}</td>
+                          <td>{formatDecimal(product.qtySoldTotal)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3>Produtos finais</h3>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>SKU</th>
+                      <th>Estoque</th>
+                      <th>Capacidade de producao atual</th>
+                      <th>Ja sairam</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.length === 0 ? (
+                      <tr>
+                        <td colSpan={5}>Nenhum produto cadastrado.</td>
+                      </tr>
+                    ) : (
+                      products.map((product) => (
+                        <tr key={product.id}>
+                          <td>{product.name}</td>
+                          <td>{product.sku}</td>
+                          <td>{formatDecimal(product.qtyInStock)}</td>
+                          <td>{formatDecimal(product.productionCapacity ?? '0')}</td>
+                          <td>{formatDecimal(product.qtySoldTotal)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
