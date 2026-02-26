@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth-provider';
 import { DeleteActionDialog } from '@/components/delete-action-dialog';
 import { ItemPurchaseSourcesModal, type ItemPurchaseSourceModalRow } from '@/components/item-purchase-sources-modal';
 import { MovementSummaryModal, type MovementSummaryRow } from '@/components/movement-summary-modal';
+import { PanelModal } from '@/components/panel-modal';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal, formatMovementReason, formatUserDisplayName } from '@/lib/format';
 import { itemFormSchema } from '@/lib/schemas';
@@ -169,6 +170,8 @@ export default function ItemsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ item: ItemRecord; qty: string } | null>(null);
   const [movementDialogItem, setMovementDialogItem] = useState<ItemRecord | null>(null);
   const [movementDialogRows, setMovementDialogRows] = useState<MovementSummaryRow[]>([]);
@@ -204,9 +207,9 @@ export default function ItemsPage() {
     }
   }
 
-  async function loadDetail(id: string) {
+  async function loadDetail(id: string): Promise<boolean> {
     if (!token) {
-      return;
+      return false;
     }
     setError(null);
     try {
@@ -227,8 +230,10 @@ export default function ItemsPage() {
         qtyOnHand: response.item.qtyOnHand,
         minQty: response.item.minQty ?? '',
       });
+      return true;
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar detalhe do item');
+      return false;
     }
   }
 
@@ -263,6 +268,7 @@ export default function ItemsPage() {
       });
       setCreateForm(emptyItemForm());
       setSuccess('Item criado com sucesso.');
+      setCreateDialogOpen(false);
       await loadItems();
     } catch (caughtError) {
       if (caughtError instanceof z.ZodError) {
@@ -480,6 +486,13 @@ export default function ItemsPage() {
     setMovementDialogLoading(false);
   }
 
+  async function openDetailDialog(id: string) {
+    const loaded = await loadDetail(id);
+    if (loaded) {
+      setDetailDialogOpen(true);
+    }
+  }
+
   function openPurchaseSourcesDialog(item: ItemRecord) {
     setPurchaseSourcesDialogItem(item);
   }
@@ -538,6 +551,11 @@ export default function ItemsPage() {
             <div>
               <h1 className="page-title">Itens / Matéria-prima</h1>
               <p className="page-subtitle">Cadastro, edição e histórico de movimentações por item.</p>
+            </div>
+            <div className="actions" style={{ marginTop: '0.5rem' }}>
+              <button type="button" className="button" onClick={() => setCreateDialogOpen(true)}>
+                Criar item
+              </button>
             </div>
             <div className="actions">
               <input
@@ -599,7 +617,7 @@ export default function ItemsPage() {
                         <td>
                           <div className="actions">
                             {belowMin ? <span className="badge warn">Abaixo min.</span> : null}
-                            <button type="button" className="button ghost" onClick={() => void loadDetail(item.id)}>
+                            <button type="button" className="button ghost" onClick={() => void openDetailDialog(item.id)}>
                               Detalhe
                             </button>
                             <button type="button" className="button danger" onClick={() => openDeleteDialog(item)}>
@@ -616,8 +634,8 @@ export default function ItemsPage() {
           </div>
         </section>
 
-        <section className="grid two">
-          <div className="panel">
+        <PanelModal open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} wide>
+          <div className="panel modal-panel-shell">
             <h2>Criar item</h2>
             <form className="form-grid" onSubmit={handleCreate}>
               <div className="field">
@@ -700,8 +718,10 @@ export default function ItemsPage() {
               </div>
             </form>
           </div>
+        </PanelModal>
 
-          <div className="panel">
+        <PanelModal open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} wide>
+          <div className="panel modal-panel-shell">
             <h2>Detalhe / editar</h2>
             {!selectedItem || !detail ? (
               <p className="small">Selecione um item na lista para editar e ver o histórico.</p>
@@ -862,7 +882,7 @@ export default function ItemsPage() {
               </div>
             )}
           </div>
-        </section>
+        </PanelModal>
 
         <DeleteActionDialog
           open={deleteDialog != null}

@@ -7,6 +7,7 @@ import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { DeleteActionDialog } from '@/components/delete-action-dialog';
 import { MovementSummaryModal, type MovementSummaryRow } from '@/components/movement-summary-modal';
+import { PanelModal } from '@/components/panel-modal';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDecimal } from '@/lib/format';
 import { bomLineSchema, productFormSchema } from '@/lib/schemas';
@@ -136,6 +137,8 @@ export default function ProductsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ product: ProductRecord; qty: string } | null>(null);
   const [capacityDialogProduct, setCapacityDialogProduct] = useState<ProductRecord | null>(null);
   const [movementDialogProduct, setMovementDialogProduct] = useState<ProductRecord | null>(null);
@@ -190,9 +193,9 @@ export default function ProductsPage() {
     }
   }
 
-  async function loadDetail(id: string) {
+  async function loadDetail(id: string): Promise<boolean> {
     if (!token) {
-      return;
+      return false;
     }
     setError(null);
     try {
@@ -213,8 +216,10 @@ export default function ProductsPage() {
           qtyRequired: line.qtyRequired,
         })),
       );
+      return true;
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao carregar produto');
+      return false;
     }
   }
 
@@ -245,6 +250,7 @@ export default function ProductsPage() {
       });
       setCreateForm(emptyProductForm());
       setSuccess('Produto criado com sucesso.');
+      setCreateDialogOpen(false);
       await loadProducts();
     } catch (caughtError) {
       if (caughtError instanceof z.ZodError) {
@@ -477,6 +483,13 @@ export default function ProductsPage() {
     setIntermediateBomLines((current) => [...current, { intermediateProductId: '', qtyRequired: '1' }]);
   }
 
+  async function openDetailDialog(id: string) {
+    const loaded = await loadDetail(id);
+    if (loaded) {
+      setDetailDialogOpen(true);
+    }
+  }
+
   return (
     <RequireAuth>
       <AppShell>
@@ -485,6 +498,11 @@ export default function ProductsPage() {
             <div>
               <h1 className="page-title">Produtos finais</h1>
               <p className="page-subtitle">Cadastro de produtos e edição da receita/BOM.</p>
+            </div>
+            <div className="actions" style={{ marginTop: '0.5rem' }}>
+              <button type="button" className="button" onClick={() => setCreateDialogOpen(true)}>
+                Criar produto
+              </button>
             </div>
             <div className="actions">
               <input
@@ -557,7 +575,7 @@ export default function ProductsPage() {
                       </td>
                       <td>
                         <div className="actions">
-                          <button type="button" className="button ghost" onClick={() => void loadDetail(product.id)}>
+                          <button type="button" className="button ghost" onClick={() => void openDetailDialog(product.id)}>
                             Editar / BOM
                           </button>
                           <button type="button" className="button danger" onClick={() => openDeleteDialog(product)}>
@@ -573,8 +591,8 @@ export default function ProductsPage() {
           </div>
         </section>
 
-        <section className="grid two">
-          <div className="panel">
+        <PanelModal open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} wide>
+          <div className="panel modal-panel-shell">
             <h2>Criar produto</h2>
             <form className="form-grid" onSubmit={handleCreate}>
               <div className="field">
@@ -633,8 +651,10 @@ export default function ProductsPage() {
               </div>
             </form>
           </div>
+        </PanelModal>
 
-          <div className="panel">
+        <PanelModal open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} wide>
+          <div className="panel modal-panel-shell">
             <h2>Editar produto / BOM</h2>
             {!selectedProductId || !detail ? (
               <p className="small">Selecione um produto para editar os dados e a BOM.</p>
@@ -877,7 +897,7 @@ export default function ProductsPage() {
               </div>
             )}
           </div>
-        </section>
+        </PanelModal>
 
         <DeleteActionDialog
           open={deleteDialog != null}

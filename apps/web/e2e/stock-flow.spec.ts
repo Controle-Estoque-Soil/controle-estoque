@@ -54,8 +54,10 @@ test.describe.serial('stock platform e2e', () => {
     await login(page);
 
     await openNav(page, '/items', async () => {
-      await expect(page.getByRole('heading', { name: 'Criar item' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Itens / Materia-prima' })).toBeVisible();
     });
+    await page.getByRole('button', { name: 'Criar item' }).click();
+    await expect(page.getByRole('heading', { name: 'Criar item' })).toBeVisible();
 
     const createItemPanel = page.locator('.panel').filter({ has: page.getByRole('heading', { name: 'Criar item' }) });
     await createItemPanel.getByLabel('Nome').fill(ITEM_NAME);
@@ -69,8 +71,10 @@ test.describe.serial('stock platform e2e', () => {
     await expectItemStock(page, /20/);
 
     await openNav(page, '/products', async () => {
-      await expect(page.getByRole('heading', { name: 'Criar produto' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Produtos finais' })).toBeVisible();
     });
+    await page.getByRole('button', { name: 'Criar produto' }).click();
+    await expect(page.getByRole('heading', { name: 'Criar produto' })).toBeVisible();
 
     const createProductPanel = page.locator('.panel').filter({ has: page.getByRole('heading', { name: 'Criar produto' }) });
     await createProductPanel.getByLabel('Nome').fill(PRODUCT_NAME);
@@ -107,7 +111,7 @@ test.describe.serial('stock platform e2e', () => {
     await expect(page.getByText(/sucesso/i)).toBeVisible();
 
     await openNav(page, '/items', async () => {
-      await expect(page.getByRole('heading', { name: 'Criar item' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Itens / Materia-prima' })).toBeVisible();
     });
     await expectItemStock(page, /15/);
   });
@@ -128,7 +132,7 @@ test.describe.serial('stock platform e2e', () => {
     await expect(page.getByText(/sucesso/i)).toBeVisible();
 
     await openNav(page, '/items', async () => {
-      await expect(page.getByRole('heading', { name: 'Criar item' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Itens / Materia-prima' })).toBeVisible();
     });
     await expectItemStock(page, /22[,.]5/);
   });
@@ -149,7 +153,7 @@ test.describe.serial('stock platform e2e', () => {
     await expect(page.getByRole('button', { name: /Confirmar/ })).toBeDisabled();
 
     await openNav(page, '/items', async () => {
-      await expect(page.getByRole('heading', { name: 'Criar item' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Itens / Materia-prima' })).toBeVisible();
     });
     await expectItemStock(page, /22[,.]5/);
   });
