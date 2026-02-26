@@ -55,6 +55,12 @@ type FlattenBomResult = {
   notes: string[];
 };
 
+type ProductWithBomForStockConsumption = ProductForCapacity & {
+  id: string;
+  kind: ProductKind;
+  name: string;
+};
+
 function normalizeSku(sku?: string | null): string | undefined {
   const normalized = sku?.trim().toUpperCase();
   return normalized ? normalized : undefined;
@@ -91,6 +97,10 @@ function generateAutoSku(prefix: 'PRD' | 'INT'): string {
 
 function buildMovementReferenceCandidate(): string {
   return `MOV-${createHash('sha256').update(randomUUID()).digest('hex').slice(0, 16).toUpperCase()}`;
+}
+
+function getProductKindLabel(kind: ProductKind): string {
+  return kind === 'INTERMEDIATE' ? 'produto intermediario' : 'produto';
 }
 
 function serializeProduct(product: {
@@ -288,6 +298,84 @@ function computeProductionCapacity(product: ProductForCapacity) {
   };
 }
 
+async function consumeItemsForManualStockIncrease(params: {
+  tx: Prisma.TransactionClient;
+  generateUniqueMovementReferenceId: (tx: Prisma.TransactionClient) => Promise<string>;
+  product: ProductWithBomForStockConsumption;
+  qtyStockIncrease: Prisma.Decimal;
+  actorSub: string;
+}) {
+  const { tx, product, qtyStockIncrease, actorSub, generateUniqueMovementReferenceId } = params;
+
+  if (qtyStockIncrease.lte(0)) {
+    return;
+  }
+
+  const noComponents = product.bomItems.length === 0 && product.bomIntermediateProducts.length === 0;
+  if (noComponents) {
+    throw appErrors.badRequest(
+      'Nao e possivel aumentar estoque de produto sem BOM. Cadastre a BOM antes de informar quantidade em estoque.',
+    );
+  }
+
+  const flattened = flattenProductBom(product);
+  if (flattened.notes.length > 0) {
+    throw appErrors.badRequest(flattened.notes[0] ?? 'BOM invalida');
+  }
+
+  const itemIds = flattened.lines.map((line) => line.itemId).sort();
+  await tx.$queryRaw`SELECT id FROM "items" WHERE id IN (${Prisma.join(itemIds)}) FOR UPDATE`;
+
+  const currentItems = await tx.item.findMany({
+    where: { id: { in: itemIds } },
+  });
+  const currentItemsMap = new Map(currentItems.map((item) => [item.id, item]));
+
+  if (currentItems.length !== itemIds.length) {
+    throw appErrors.badRequest('BOM references missing item(s)');
+  }
+
+  const movementReferenceId = await generateUniqueMovementReferenceId(tx);
+  const stockMovementRows: Prisma.StockMovementCreateManyInput[] = [];
+
+  for (const flattenedLine of flattened.lines) {
+    const item = currentItemsMap.get(flattenedLine.itemId);
+    if (!item) {
+      throw appErrors.badRequest('BOM references missing item(s)');
+    }
+
+    const consumeQty = flattenedLine.qtyRequiredPerProduct.mul(qtyStockIncrease);
+    const nextItemQty = item.qtyOnHand.sub(consumeQty);
+
+    if (nextItemQty.isNegative()) {
+      throw appErrors.conflict(
+        `Estoque insuficiente para aumentar estoque do produto. Item: ${item.name} (disponivel ${decimalToString(item.qtyOnHand) ?? '0'})`,
+      );
+    }
+
+    await tx.item.update({
+      where: { id: item.id },
+      data: { qtyOnHand: nextItemQty },
+    });
+
+    stockMovementRows.push({
+      itemId: item.id,
+      deltaQty: consumeQty.neg(),
+      reason: 'MANUAL_ADJUSTMENT',
+      referenceType: 'MANUAL_ADJUSTMENT',
+      referenceId: movementReferenceId,
+      note: `[PRODUTO_ESTOQUE] Consumo automatico por aumento de estoque do ${getProductKindLabel(product.kind)} "${product.name}" (+${decimalToString(qtyStockIncrease) ?? '0'} un)`,
+      createdByUserId: actorSub,
+    });
+  }
+
+  if (stockMovementRows.length > 0) {
+    await tx.stockMovement.createMany({
+      data: stockMovementRows,
+    });
+  }
+}
+
 export class ProductsService {
   constructor(private readonly productsRepository: ProductsRepository) {}
 
@@ -398,70 +486,13 @@ export class ProductsService {
           throw appErrors.notFound('Product not found');
         }
         ensureExpectedKind(productWithBom, expectedKind);
-
-        const noComponents = productWithBom.bomItems.length === 0 && productWithBom.bomIntermediateProducts.length === 0;
-        if (noComponents) {
-          throw appErrors.badRequest(
-            'Nao e possivel aumentar estoque de produto sem BOM. Cadastre a BOM antes de informar quantidade em estoque.',
-          );
-        }
-
-        const flattened = flattenProductBom(productWithBom);
-        if (flattened.notes.length > 0) {
-          throw appErrors.badRequest(flattened.notes[0] ?? 'BOM invalida');
-        }
-
-        const itemIds = flattened.lines.map((line) => line.itemId).sort();
-        await tx.$queryRaw`SELECT id FROM "items" WHERE id IN (${Prisma.join(itemIds)}) FOR UPDATE`;
-
-        const currentItems = await tx.item.findMany({
-          where: { id: { in: itemIds } },
+        await consumeItemsForManualStockIncrease({
+          tx,
+          generateUniqueMovementReferenceId: (client) => this.generateUniqueMovementReferenceId(client),
+          product: productWithBom,
+          qtyStockIncrease,
+          actorSub: actor.sub,
         });
-        const currentItemsMap = new Map(currentItems.map((item) => [item.id, item]));
-
-        if (currentItems.length !== itemIds.length) {
-          throw appErrors.badRequest('BOM references missing item(s)');
-        }
-
-        const movementReferenceId = await this.generateUniqueMovementReferenceId(tx);
-        const stockMovementRows: Prisma.StockMovementCreateManyInput[] = [];
-
-        for (const flattenedLine of flattened.lines) {
-          const item = currentItemsMap.get(flattenedLine.itemId);
-          if (!item) {
-            throw appErrors.badRequest('BOM references missing item(s)');
-          }
-
-          const consumeQty = flattenedLine.qtyRequiredPerProduct.mul(qtyStockIncrease);
-          const nextItemQty = item.qtyOnHand.sub(consumeQty);
-
-          if (nextItemQty.isNegative()) {
-            throw appErrors.conflict(
-              `Estoque insuficiente para aumentar estoque do produto. Item: ${item.name} (disponivel ${decimalToString(item.qtyOnHand) ?? '0'})`,
-            );
-          }
-
-          await tx.item.update({
-            where: { id: item.id },
-            data: { qtyOnHand: nextItemQty },
-          });
-
-          stockMovementRows.push({
-            itemId: item.id,
-            deltaQty: consumeQty.neg(),
-            reason: 'MANUAL_ADJUSTMENT',
-            referenceType: 'MANUAL_ADJUSTMENT',
-            referenceId: movementReferenceId,
-            note: `[PRODUTO_ESTOQUE] Consumo automatico por aumento de estoque do produto "${productWithBom.name}" (+${decimalToString(qtyStockIncrease) ?? '0'} un)`,
-            createdByUserId: actor.sub,
-          });
-        }
-
-        if (stockMovementRows.length > 0) {
-          await tx.stockMovement.createMany({
-            data: stockMovementRows,
-          });
-        }
       }
 
       return this.productsRepository.update(
