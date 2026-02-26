@@ -17,6 +17,20 @@ async function login(page: Page) {
 }
 
 async function openNav(page: Page, href: string, readySelector: () => Promise<void>) {
+  const modalOverlays = page.locator('.modal-overlay');
+  if ((await modalOverlays.count()) > 0) {
+    const overlay = modalOverlays.last();
+    if (await overlay.isVisible().catch(() => false)) {
+      const closeButton = overlay.getByRole('button', { name: 'Fechar' });
+      if ((await closeButton.count()) > 0 && (await closeButton.first().isVisible().catch(() => false))) {
+        await closeButton.first().click();
+      } else {
+        await overlay.click({ position: { x: 8, y: 8 } });
+      }
+      await expect(overlay).toBeHidden({ timeout: 5000 });
+    }
+  }
+
   await page.locator(`a[href="${href}"]`).click();
   await readySelector();
 }
