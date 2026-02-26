@@ -20,6 +20,7 @@ export interface ItemUpdateRecordInput {
   unit?: string;
   unitPrice?: Prisma.Decimal;
   purchaseLeadTimeDays?: Prisma.Decimal | null;
+  qtyOnHand?: Prisma.Decimal;
   minQty?: Prisma.Decimal | null;
   purchaseSources?: ItemPurchaseSourceRecordInput[];
 }

@@ -232,33 +232,65 @@ export class ItemsService {
     return serializeItem(item);
   }
 
-  async update(id: string, input: ItemUpdateBody): Promise<ItemResponse> {
-    const existing = await this.itemsRepository.getById(id);
-    if (!existing) {
-      throw appErrors.notFound('Item not found');
+  async update(id: string, input: ItemUpdateBody, actor: JwtUserPayload): Promise<ItemResponse> {
+    const nextQtyOnHand = input.qtyOnHand === undefined ? undefined : toDecimal(input.qtyOnHand);
+
+    if (nextQtyOnHand?.isNegative()) {
+      throw appErrors.badRequest('qtyOnHand must be non-negative');
     }
 
-    const updated = await this.itemsRepository.update(id, {
-      name: input.name?.trim(),
-      sku: resolveItemSkuForUpdate(input.sku),
-      unit: input.unit?.trim(),
-      unitPrice: input.unitPrice ? toDecimal(input.unitPrice) : undefined,
-      purchaseLeadTimeDays:
-        input.purchaseLeadTimeDays === undefined
-          ? undefined
-          : input.purchaseLeadTimeDays === null
-            ? null
-            : toDecimal(input.purchaseLeadTimeDays),
-      purchaseSources: normalizePurchaseSourceInput(input.purchaseSources),
-      minQty:
-        input.minQty === undefined
-          ? undefined
-          : input.minQty === null
-            ? null
-            : toDecimal(input.minQty),
+    const item = await this.itemsRepository.transaction(async (tx) => {
+      const existing = await tx.item.findUnique({ where: { id } });
+      if (!existing) {
+        throw appErrors.notFound('Item not found');
+      }
+
+      const updated = await this.itemsRepository.update(
+        id,
+        {
+          name: input.name?.trim(),
+          sku: resolveItemSkuForUpdate(input.sku),
+          unit: input.unit?.trim(),
+          unitPrice: input.unitPrice ? toDecimal(input.unitPrice) : undefined,
+          purchaseLeadTimeDays:
+            input.purchaseLeadTimeDays === undefined
+              ? undefined
+              : input.purchaseLeadTimeDays === null
+                ? null
+                : toDecimal(input.purchaseLeadTimeDays),
+          purchaseSources: normalizePurchaseSourceInput(input.purchaseSources),
+          qtyOnHand: nextQtyOnHand,
+          minQty:
+            input.minQty === undefined
+              ? undefined
+              : input.minQty === null
+                ? null
+                : toDecimal(input.minQty),
+        },
+        tx,
+      );
+
+      if (nextQtyOnHand !== undefined) {
+        const deltaQty = nextQtyOnHand.sub(existing.qtyOnHand);
+        if (!deltaQty.isZero()) {
+          await this.itemsRepository.createMovement(
+            {
+              itemId: id,
+              deltaQty,
+              reason: 'MANUAL_ADJUSTMENT',
+              referenceType: 'MANUAL_ADJUSTMENT',
+              note: 'Ajuste de estoque pela edicao do item',
+              createdByUserId: actor.sub,
+            },
+            tx,
+          );
+        }
+      }
+
+      return updated;
     });
 
-    return serializeItem(updated);
+    return serializeItem(item);
   }
 
   async remove(id: string): Promise<ItemResponse> {

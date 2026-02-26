@@ -47,6 +47,7 @@ export const itemUpdateBodySchema = z
     unit: z.string().min(1).max(20).optional(),
     unitPrice: nonNegativeDecimalStringSchema.optional(),
     purchaseLeadTimeDays: nonNegativeDecimalStringSchema.nullable().optional(),
+    qtyOnHand: nonNegativeDecimalStringSchema.optional(),
     minQty: nonNegativeDecimalStringSchema.nullable().optional(),
     purchaseSources: z.array(itemPurchaseSourceInputSchema).max(50).optional(),
   })

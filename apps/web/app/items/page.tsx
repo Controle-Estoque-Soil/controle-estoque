@@ -296,6 +296,7 @@ export default function ItemsPage() {
           unitPrice: parsed.unitPrice,
           purchaseLeadTimeDays: parsed.purchaseLeadTimeDays === '' ? null : parsed.purchaseLeadTimeDays,
           purchaseSources: sanitizePurchaseSources(parsed.purchaseSources),
+          qtyOnHand: parsed.qtyOnHand,
           minQty: parsed.minQty,
         },
       });
@@ -738,8 +739,8 @@ export default function ItemsPage() {
                     />
                   </div>
                   <div className="field">
-                    <label>Qtd em estoque (somente leitura)</label>
-                    <input className="input" value={detail.item.qtyOnHand} readOnly />
+                    <label>Qtd em estoque</label>
+                    <input className="input" value={editForm.qtyOnHand} onChange={(e) => setEditForm({ ...editForm, qtyOnHand: e.target.value })} />
                   </div>
                   <div className="field">
                     <label>Estoque minimo</label>
