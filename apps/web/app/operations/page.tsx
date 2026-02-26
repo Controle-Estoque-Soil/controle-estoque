@@ -482,7 +482,7 @@ export default function OperationsPage() {
                   <label>Aplicar em</label>
                   <span className="small">Selecao obrigatoria</span>
                 </div>
-                <div className="segmented" role="tablist" aria-label="Aplicar em">
+                <div className="segmented segmented-inline" role="tablist" aria-label="Aplicar em">
                   <button
                     type="button"
                     role="tab"

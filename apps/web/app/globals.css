@@ -584,6 +584,22 @@ a {
   box-shadow: 0 4px 12px rgba(16, 35, 25, 0.06);
 }
 
+.segmented.segmented-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.3rem;
+}
+
+.segmented.segmented-inline .segmented-button {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
 .selector-stack {
   display: grid;
   gap: 0.9rem;
