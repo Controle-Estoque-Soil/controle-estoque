@@ -581,8 +581,8 @@ export default function ItemsPage() {
                   <th>Preço médio</th>
                   <th>Estoque</th>
                   <th>Tempo compra (dias)</th>
-                  <th>Onde comprar</th>
                   <th>Mínimo</th>
+                  <th>Onde comprar</th>
                   <th>Movimentacoes</th>
                   <th>Ações</th>
                 </tr>
@@ -603,12 +603,12 @@ export default function ItemsPage() {
                         <td>{formatDecimal(item.unitPrice)}</td>
                         <td>{formatDecimal(item.qtyOnHand)}</td>
                         <td>{item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-'}</td>
+                        <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
                         <td>
                           <button type="button" className="button ghost compact" onClick={() => openPurchaseSourcesDialog(item)}>
                             Ver mais
                           </button>
                         </td>
-                        <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
                         <td>
                           <button type="button" className="button ghost compact" onClick={() => void openItemMovementsDialog(item)}>
                             Movimentacoes
