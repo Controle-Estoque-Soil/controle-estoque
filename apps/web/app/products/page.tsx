@@ -499,12 +499,7 @@ export default function ProductsPage() {
               <h1 className="page-title">Produtos finais</h1>
               <p className="page-subtitle">Cadastro de produtos e edição da receita/BOM.</p>
             </div>
-            <div className="actions" style={{ marginTop: '0.5rem' }}>
-              <button type="button" className="button" onClick={() => setCreateDialogOpen(true)}>
-                Criar produto
-              </button>
-            </div>
-            <div className="actions">
+            <div className="actions header-search-actions">
               <input
                 className="input"
                 placeholder="Buscar por nome ou SKU"
@@ -513,6 +508,9 @@ export default function ProductsPage() {
               />
               <button type="button" className="button ghost" onClick={() => void loadProducts()} disabled={loading}>
                 {loading ? 'Carregando...' : 'Buscar'}
+              </button>
+              <button type="button" className="button" onClick={() => setCreateDialogOpen(true)}>
+                Criar produto
               </button>
             </div>
           </div>

@@ -502,12 +502,7 @@ export default function IntermediateProductsPage() {
               <h1 className="page-title">Produtos intermediarios</h1>
               <p className="page-subtitle">Cadastro de produtos intermediarios e edicao da receita/BOM (somente itens).</p>
             </div>
-            <div className="actions" style={{ marginTop: '0.5rem' }}>
-              <button type="button" className="button" onClick={() => setCreateDialogOpen(true)}>
-                Criar produto intermediario
-              </button>
-            </div>
-            <div className="actions">
+            <div className="actions header-search-actions">
               <input
                 className="input"
                 placeholder="Buscar por nome ou SKU"
@@ -516,6 +511,9 @@ export default function IntermediateProductsPage() {
               />
               <button type="button" className="button ghost" onClick={() => void loadProducts()} disabled={loading}>
                 {loading ? 'Carregando...' : 'Buscar'}
+              </button>
+              <button type="button" className="button" onClick={() => setCreateDialogOpen(true)}>
+                Criar produto intermediario
               </button>
             </div>
           </div>

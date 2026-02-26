@@ -552,12 +552,7 @@ export default function ItemsPage() {
               <h1 className="page-title">Itens / Matéria-prima</h1>
               <p className="page-subtitle">Cadastro, edição e histórico de movimentações por item.</p>
             </div>
-            <div className="actions" style={{ marginTop: '0.5rem' }}>
-              <button type="button" className="button" onClick={() => setCreateDialogOpen(true)}>
-                Criar item
-              </button>
-            </div>
-            <div className="actions">
+            <div className="actions header-search-actions">
               <input
                 className="input"
                 placeholder="Buscar por nome ou SKU"
@@ -566,6 +561,9 @@ export default function ItemsPage() {
               />
               <button type="button" className="button ghost" onClick={() => void loadItems()} disabled={loading}>
                 {loading ? 'Carregando...' : 'Buscar'}
+              </button>
+              <button type="button" className="button" onClick={() => setCreateDialogOpen(true)}>
+                Criar item
               </button>
             </div>
           </div>
