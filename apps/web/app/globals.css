@@ -382,6 +382,10 @@ a {
   border-radius: 0.9rem;
 }
 
+.catalog-table-wrap {
+  margin-top: 0.5rem;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

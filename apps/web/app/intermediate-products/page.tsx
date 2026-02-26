@@ -519,7 +519,7 @@ export default function IntermediateProductsPage() {
           </div>
           {error ? <p className="inline-error">{error}</p> : null}
           {success ? <p className="inline-success">{success}</p> : null}
-          <div className="table-wrap">
+          <div className="table-wrap catalog-table-wrap">
             <table className="table">
               <thead>
                 <tr>
