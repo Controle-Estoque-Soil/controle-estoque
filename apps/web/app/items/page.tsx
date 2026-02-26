@@ -521,12 +521,13 @@ export default function ItemsPage() {
             <h2>Criar item</h2>
             <form className="form-grid" onSubmit={handleCreate}>
               <div className="field">
-                <label>Nome</label>
-                <input className="input" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
+                <label htmlFor="create-item-name">Nome</label>
+                <input id="create-item-name" className="input" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
               </div>
               <div className="field">
-                <label>SKU (opcional)</label>
+                <label htmlFor="create-item-sku">SKU (opcional)</label>
                 <input
+                  id="create-item-sku"
                   className="input"
                   placeholder="Gerado automaticamente se vazio"
                   value={createForm.sku}
@@ -534,16 +535,17 @@ export default function ItemsPage() {
                 />
               </div>
               <div className="field">
-                <label>Unidade</label>
-                <input className="input" value={createForm.unit} onChange={(e) => setCreateForm({ ...createForm, unit: e.target.value })} />
+                <label htmlFor="create-item-unit">Unidade</label>
+                <input id="create-item-unit" className="input" value={createForm.unit} onChange={(e) => setCreateForm({ ...createForm, unit: e.target.value })} />
               </div>
               <div className="field">
-                <label>Preço unitário</label>
-                <input className="input" value={createForm.unitPrice} onChange={(e) => setCreateForm({ ...createForm, unitPrice: e.target.value })} />
+                <label htmlFor="create-item-unit-price">Preço unitário</label>
+                <input id="create-item-unit-price" className="input" value={createForm.unitPrice} onChange={(e) => setCreateForm({ ...createForm, unitPrice: e.target.value })} />
               </div>
               <div className="field">
-                <label>Tempo medio para compra (dias) (opcional)</label>
+                <label htmlFor="create-item-purchase-lead-time">Tempo medio para compra (dias) (opcional)</label>
                 <input
+                  id="create-item-purchase-lead-time"
                   className="input"
                   placeholder="Ex.: 7 ou 3.5"
                   value={createForm.purchaseLeadTimeDays}
@@ -551,12 +553,12 @@ export default function ItemsPage() {
                 />
               </div>
               <div className="field">
-                <label>Qtd inicial</label>
-                <input className="input" value={createForm.qtyOnHand} onChange={(e) => setCreateForm({ ...createForm, qtyOnHand: e.target.value })} />
+                <label htmlFor="create-item-qty-on-hand">Qtd inicial</label>
+                <input id="create-item-qty-on-hand" className="input" value={createForm.qtyOnHand} onChange={(e) => setCreateForm({ ...createForm, qtyOnHand: e.target.value })} />
               </div>
               <div className="field">
-                <label>Estoque minimo</label>
-                <input className="input" value={createForm.minQty} onChange={(e) => setCreateForm({ ...createForm, minQty: e.target.value })} />
+                <label htmlFor="create-item-min-qty">Estoque minimo</label>
+                <input id="create-item-min-qty" className="input" value={createForm.minQty} onChange={(e) => setCreateForm({ ...createForm, minQty: e.target.value })} />
               </div>
               <div className="actions full">
                 <button className="button" type="submit" disabled={saving}>
