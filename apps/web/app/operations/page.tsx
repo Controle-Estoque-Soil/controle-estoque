@@ -11,12 +11,21 @@ import { formatDateTime, formatDecimal, formatOperationType } from '@/lib/format
 import { itemOperationFormSchema, operationFormSchema, productInboundSourceSchema } from '@/lib/schemas';
 
 type ProductOption = { id: string; kind?: 'FINAL' | 'INTERMEDIATE'; name: string; sku: string };
+type ItemPurchaseSourceOption = {
+  id: string;
+  source: string | null;
+  price: string | null;
+  sortOrder: number;
+};
+
 type ItemOption = {
   id: string;
   name: string;
   sku: string;
   unit: string;
   unitPrice: string;
+  purchaseLeadTimeDays: string | null;
+  purchaseSources: ItemPurchaseSourceOption[];
   qtyOnHand: string;
   minQty: string | null;
 };
@@ -66,6 +75,18 @@ type ItemOperationPreview = {
   canExecute: boolean;
   negativeBlocked: boolean;
   minWarning: boolean;
+};
+
+type ProcurementGuideItem = {
+  itemId: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+  requiredQty: string;
+  availableQty: string;
+  missingQty: string;
+  purchaseLeadTimeDays: string | null;
+  purchaseSources: ItemPurchaseSourceOption[];
 };
 
 type OrderListRecord = {
@@ -128,6 +149,22 @@ function buildSignedDelta(mode: 'outbound' | 'inbound', qty: string): string {
   return mode === 'outbound' ? `-${qty}` : qty;
 }
 
+function subtractNonNegative(requiredQty: string, availableQty: string): string {
+  const required = toNumber(requiredQty) ?? 0;
+  const available = toNumber(availableQty) ?? 0;
+  return Math.max(required - available, 0).toString();
+}
+
+function slugifyForFileName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
 export default function OperationsPage() {
   const { token, user } = useAuth();
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -154,6 +191,7 @@ export default function OperationsPage() {
   const [loading, setLoading] = useState(false);
   const [runningPreview, setRunningPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [generatingProcurementPdf, setGeneratingProcurementPdf] = useState(false);
 
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
@@ -187,6 +225,53 @@ export default function OperationsPage() {
     () => new Set(productMinWarnings.map((warning) => warning.itemId)),
     [productMinWarnings],
   );
+
+  const productProcurementGuideItems = useMemo<ProcurementGuideItem[]>(() => {
+    if (!productPreview || productPreview.shortages.length === 0) {
+      return [];
+    }
+
+    const lineByItemId = new Map(productPreview.lines.map((line) => [line.itemId, line]));
+
+    return productPreview.shortages.map((shortage) => {
+      const item = itemsById.get(shortage.itemId);
+      const line = lineByItemId.get(shortage.itemId);
+
+      return {
+        itemId: shortage.itemId,
+        itemName: shortage.itemName,
+        itemSku: line?.itemSku ?? item?.sku ?? '-',
+        itemUnit: line?.itemUnit ?? item?.unit ?? '',
+        requiredQty: shortage.requiredQty,
+        availableQty: shortage.availableQty,
+        missingQty: subtractNonNegative(shortage.requiredQty, shortage.availableQty),
+        purchaseLeadTimeDays: item?.purchaseLeadTimeDays ?? null,
+        purchaseSources: item?.purchaseSources ?? [],
+      };
+    });
+  }, [itemsById, productPreview]);
+
+  const itemProcurementGuideItems = useMemo<ProcurementGuideItem[]>(() => {
+    if (!itemPreview?.negativeBlocked) {
+      return [];
+    }
+
+    const item = itemsById.get(itemPreview.itemId);
+
+    return [
+      {
+        itemId: itemPreview.itemId,
+        itemName: itemPreview.itemName,
+        itemSku: itemPreview.itemSku,
+        itemUnit: itemPreview.itemUnit,
+        requiredQty: itemPreview.qty,
+        availableQty: itemPreview.currentQtyOnHand,
+        missingQty: subtractNonNegative(itemPreview.qty, itemPreview.currentQtyOnHand),
+        purchaseLeadTimeDays: item?.purchaseLeadTimeDays ?? null,
+        purchaseSources: item?.purchaseSources ?? [],
+      },
+    ];
+  }, [itemPreview, itemsById]);
 
   async function loadProducts() {
     if (!token) {
@@ -264,6 +349,162 @@ export default function OperationsPage() {
     setSelectedOrder(null);
     setOrderDetailError(null);
     setOrderDetailLoading(false);
+  }
+
+  async function handleGenerateProcurementPdf() {
+    const blockedItems = isProductLikeTarget ? productProcurementGuideItems : itemProcurementGuideItems;
+    if (blockedItems.length === 0) {
+      setError('Nao ha itens bloqueados para gerar PDF de compras');
+      return;
+    }
+
+    setGeneratingProcurementPdf(true);
+    setError(null);
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      const operationTitle = isProductLikeTarget
+        ? `${mode === 'outbound' ? 'Saida' : 'Entrada'} de ${target === 'intermediateProduct' ? 'produto intermediario' : 'produto'}`
+        : `${mode === 'outbound' ? 'Saida' : 'Entrada'} de item`;
+
+      const selectedProduct = isProductLikeTarget
+        ? productOptionsForTarget.find((product) => product.id === productForm.productId) ?? null
+        : null;
+
+      const contextName = isProductLikeTarget
+        ? selectedProduct?.name ?? productPreview?.product.name ?? 'Produto'
+        : itemPreview?.itemName ?? selectedItemForForm?.name ?? 'Item';
+
+      const contextSku = isProductLikeTarget
+        ? selectedProduct?.sku ?? productPreview?.product.sku ?? ''
+        : itemPreview?.itemSku ?? selectedItemForForm?.sku ?? '';
+
+      const operationQty = isProductLikeTarget ? productForm.qty : itemForm.qty;
+
+      const ensureSpace = (requiredHeight: number) => {
+        if (y + requiredHeight <= pageHeight - margin) {
+          return;
+        }
+        doc.addPage();
+        y = margin;
+      };
+
+      const drawSimpleTable = (headers: [string, string], rows: Array<[string, string]>) => {
+        const colWidths = [contentWidth * 0.72, contentWidth * 0.28];
+        const paddingX = 6;
+        const paddingY = 6;
+        const headerFontSize = 9;
+        const bodyFontSize = 9;
+        const tableX = margin;
+
+        ensureSpace(34);
+        doc.setDrawColor(193, 216, 199);
+        doc.setFillColor(245, 250, 246);
+
+        const headerHeight = 24;
+        doc.rect(tableX, y, colWidths[0], headerHeight, 'FD');
+        doc.rect(tableX + colWidths[0], y, colWidths[1], headerHeight, 'FD');
+        doc.setFontSize(headerFontSize);
+        doc.setFont('helvetica', 'bold');
+        doc.text(headers[0], tableX + paddingX, y + 15);
+        doc.text(headers[1], tableX + colWidths[0] + paddingX, y + 15);
+        y += headerHeight;
+
+        doc.setFont('helvetica', 'normal');
+        for (const row of rows) {
+          const leftLines = doc.splitTextToSize(row[0] || '-', colWidths[0] - paddingX * 2) as string[];
+          const rightLines = doc.splitTextToSize(row[1] || '-', colWidths[1] - paddingX * 2) as string[];
+          const linesCount = Math.max(leftLines.length, rightLines.length, 1);
+          const rowHeight = linesCount * (bodyFontSize + 2) + paddingY * 2;
+          ensureSpace(rowHeight + 4);
+
+          doc.rect(tableX, y, colWidths[0], rowHeight);
+          doc.rect(tableX + colWidths[0], y, colWidths[1], rowHeight);
+          doc.setFontSize(bodyFontSize);
+          doc.text(leftLines, tableX + paddingX, y + paddingY + bodyFontSize);
+          doc.text(rightLines, tableX + colWidths[0] + paddingX, y + paddingY + bodyFontSize);
+          y += rowHeight;
+        }
+      };
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text('Lista de compras para completar operacao', margin, y);
+      y += 24;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Tipo: ${operationTitle}`, margin, y);
+      y += 14;
+      doc.text(`Referencia: ${contextName}${contextSku ? ` (${contextSku})` : ''}`, margin, y);
+      y += 14;
+      doc.text(`Quantidade solicitada: ${formatDecimal(operationQty || '0')}`, margin, y);
+      y += 14;
+      doc.text(`Gerado em: ${formatDateTime(new Date().toISOString())}`, margin, y);
+      y += 18;
+
+      doc.setDrawColor(193, 216, 199);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 18;
+
+      blockedItems.forEach((blockedItem, index) => {
+        ensureSpace(140);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(`${blockedItem.itemName}${blockedItem.itemSku ? ` (${blockedItem.itemSku})` : ''}`, margin, y);
+        y += 16;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        const leadTimeLabel = blockedItem.purchaseLeadTimeDays
+          ? `${formatDecimal(blockedItem.purchaseLeadTimeDays)} dia(s)`
+          : 'Nao informado';
+        doc.text(
+          `Necessario: ${formatDecimal(blockedItem.requiredQty)} ${blockedItem.itemUnit} | Disponivel: ${formatDecimal(
+            blockedItem.availableQty,
+          )} ${blockedItem.itemUnit} | Faltante: ${formatDecimal(blockedItem.missingQty)} ${blockedItem.itemUnit}`,
+          margin,
+          y,
+        );
+        y += 14;
+        doc.text(`Tempo medio para compra: ${leadTimeLabel}`, margin, y);
+        y += 12;
+
+        const sourceRows: Array<[string, string]> =
+          blockedItem.purchaseSources.length > 0
+            ? blockedItem.purchaseSources.map((source) => [
+                source.source?.trim() || 'Nao informado',
+                source.price ? `${formatDecimal(source.price)}` : '-',
+              ])
+            : [['Sem local/link de compra cadastrado', '-']];
+
+        drawSimpleTable(['Local / link', 'Preco medio'], sourceRows);
+
+        if (index < blockedItems.length - 1) {
+          y += 14;
+          ensureSpace(12);
+          doc.setDrawColor(226, 236, 229);
+          doc.line(margin, y, pageWidth - margin, y);
+          y += 14;
+        }
+      });
+
+      const fileStamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filePrefix = isProductLikeTarget ? 'lista-compras-operacao' : 'lista-compras-item';
+      const fileName = `${filePrefix}-${slugifyForFileName(contextName) || 'preview'}-${fileStamp}.pdf`;
+      doc.save(fileName);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? `Falha ao gerar PDF: ${caughtError.message}` : 'Falha ao gerar PDF');
+    } finally {
+      setGeneratingProcurementPdf(false);
+    }
   }
 
   async function handleProductPreview() {
@@ -701,6 +942,16 @@ export default function OperationsPage() {
                         </li>
                       ))}
                     </ul>
+                    <div className="actions" style={{ justifyContent: 'flex-start', marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="button ghost"
+                        disabled={generatingProcurementPdf}
+                        onClick={() => void handleGenerateProcurementPdf()}
+                      >
+                        {generatingProcurementPdf ? 'Gerando PDF...' : 'Gerar PDF de compras'}
+                      </button>
+                    </div>
                   </div>
                 ) : null}
 
@@ -790,6 +1041,16 @@ export default function OperationsPage() {
                 {itemPreview.negativeBlocked ? (
                   <div className="alert-block danger">
                     <strong>Bloqueio de estoque:</strong> a operacao deixaria o item com estoque negativo e o override nao esta habilitado.
+                    <div className="actions" style={{ justifyContent: 'flex-start', marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="button ghost"
+                        disabled={generatingProcurementPdf}
+                        onClick={() => void handleGenerateProcurementPdf()}
+                      >
+                        {generatingProcurementPdf ? 'Gerando PDF...' : 'Gerar PDF de compras'}
+                      </button>
+                    </div>
                   </div>
                 ) : null}
 
