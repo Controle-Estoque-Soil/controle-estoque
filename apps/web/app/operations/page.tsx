@@ -387,6 +387,7 @@ export default function OperationsPage() {
         : itemPreview?.itemSku ?? selectedItemForForm?.sku ?? '';
 
       const operationQty = isProductLikeTarget ? productForm.qty : itemForm.qty;
+      const generatedAtText = formatDateTime(new Date().toISOString());
 
       const ensureSpace = (requiredHeight: number) => {
         if (y + requiredHeight <= pageHeight - margin) {
@@ -439,16 +440,30 @@ export default function OperationsPage() {
       doc.text('Lista de compras para completar operacao', margin, y);
       y += 24;
 
+      const generatedBoxHeight = 34;
+      doc.setDrawColor(193, 216, 199);
+      doc.setFillColor(245, 250, 246);
+      doc.roundedRect(margin, y, contentWidth, generatedBoxHeight, 8, 8, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(22, 101, 52);
+      doc.text('GERADO EM', margin + 10, y + 13);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(17, 24, 39);
+      doc.text(generatedAtText, margin + 10, y + 27);
+      y += generatedBoxHeight + 14;
+
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
+      doc.setTextColor(17, 24, 39);
       doc.text(`Tipo: ${operationTitle}`, margin, y);
       y += 14;
       doc.text(`Referencia: ${contextName}${contextSku ? ` (${contextSku})` : ''}`, margin, y);
       y += 14;
       doc.text(`Quantidade solicitada: ${formatDecimal(operationQty || '0')}`, margin, y);
       y += 14;
-      doc.text(`Gerado em: ${formatDateTime(new Date().toISOString())}`, margin, y);
-      y += 18;
+      y += 4;
 
       doc.setDrawColor(193, 216, 199);
       doc.line(margin, y, pageWidth - margin, y);
