@@ -571,22 +571,27 @@ a {
   place-items: center;
   padding: 1rem;
   z-index: 50;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .modal-card {
   width: min(560px, 100%);
+  max-height: calc(100vh - 2rem);
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid var(--line);
   border-radius: 1rem;
   box-shadow: 0 20px 48px rgba(16, 35, 25, 0.18);
   padding: 1rem;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0.9rem;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .modal-card-wide {
   width: min(980px, 100%);
-  max-height: calc(100vh - 2rem);
 }
 
 .modal-header {
@@ -609,6 +614,9 @@ a {
   gap: 0.75rem;
   overflow: auto;
   min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overscroll-behavior: contain;
 }
 
 .modal-card .panel.modal-panel-shell {
