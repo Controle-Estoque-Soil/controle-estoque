@@ -585,19 +585,17 @@ a {
 }
 
 .segmented.segmented-inline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.3rem;
 }
 
 .segmented.segmented-inline .segmented-button {
-  flex: 0 0 auto;
-  min-width: 0;
+  width: 100%;
   padding: 0.45rem 0.9rem;
   font-size: 0.95rem;
   line-height: 1.1;
+  text-align: center;
 }
 
 .selector-stack {
