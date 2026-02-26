@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/', label: 'Dashboard' },
-    { href: '/items', label: 'Itens' },
+    { href: '/items', label: 'Itens / Materia-prima' },
     { href: '/intermediate-products', label: 'Produtos intermediarios' },
     { href: '/products', label: 'Produtos' },
     { href: '/operations', label: 'Operações' },
