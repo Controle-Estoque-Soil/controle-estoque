@@ -576,7 +576,12 @@ export class OperationsService {
       to: dateRange.to,
     });
 
-    return orders.map((order) => ({
+    const candidateOriginalOrderIds = orders.filter((order) => !order.reversalOfOrderId).map((order) => order.id);
+    const reversalOrders = await this.operationsRepository.getOrderReversalsByOriginalIds(candidateOriginalOrderIds);
+    const reversedOriginalIds = new Set(reversalOrders.map((order) => order.reversalOfOrderId).filter(Boolean) as string[]);
+    const visibleOrders = orders.filter((order) => !order.reversalOfOrderId && !reversedOriginalIds.has(order.id));
+
+    return visibleOrders.map((order) => ({
       id: order.id,
       type: order.type,
       productQty: decimalToString(order.productQty) ?? '0',

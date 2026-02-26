@@ -915,7 +915,7 @@ export default function ProductsPage() {
               : null
           }
           totalValueUnit="componentes"
-          allModeDescription="Deletar tudo tenta excluir o cadastro do produto. Se houver ordens/movimentacoes vinculadas, o sistema bloqueará a exclusão."
+          allModeDescription="Deletar tudo exclui o cadastro e remove vínculos/ordens relacionados ao produto."
           onClose={closeDeleteDialog}
           onQuantityChange={(value) =>
             setDeleteDialog((current) => (current ? { ...current, qty: value } : current))

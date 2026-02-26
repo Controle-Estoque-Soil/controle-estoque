@@ -1,6 +1,6 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { Prisma, type ProductKind } from '@prisma/client';
-import { appErrors } from '../../core/app-error';
+import { AppError, appErrors } from '../../core/app-error';
 import type { JwtUserPayload } from '../../types/auth';
 import { decimalToString, toDecimal } from '../../utils/decimal';
 import type { ProductBomReplaceBody, ProductCreateBody, ProductListQuery, ProductUpdateBody } from './products.schemas';
@@ -93,14 +93,6 @@ function normalizeOptionalLeadTime(value?: string | null): string | null | undef
 
 function generateAutoSku(prefix: 'PRD' | 'INT'): string {
   return `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
-}
-
-function buildMovementReferenceCandidate(): string {
-  return `MOV-${createHash('sha256').update(randomUUID()).digest('hex').slice(0, 16).toUpperCase()}`;
-}
-
-function getProductKindLabel(kind: ProductKind): string {
-  return kind === 'INTERMEDIATE' ? 'produto intermediario' : 'produto';
 }
 
 function serializeProduct(product: {
@@ -300,12 +292,10 @@ function computeProductionCapacity(product: ProductForCapacity) {
 
 async function syncItemsForManualStockChange(params: {
   tx: Prisma.TransactionClient;
-  generateUniqueMovementReferenceId: (tx: Prisma.TransactionClient) => Promise<string>;
   product: ProductWithBomForStockConsumption;
   qtyStockDelta: Prisma.Decimal;
-  actorSub: string;
 }) {
-  const { tx, product, qtyStockDelta, actorSub, generateUniqueMovementReferenceId } = params;
+  const { tx, product, qtyStockDelta } = params;
 
   if (qtyStockDelta.eq(0)) {
     return;
@@ -338,9 +328,6 @@ async function syncItemsForManualStockChange(params: {
     throw appErrors.badRequest('BOM references missing item(s)');
   }
 
-  const movementReferenceId = await generateUniqueMovementReferenceId(tx);
-  const stockMovementRows: Prisma.StockMovementCreateManyInput[] = [];
-
   for (const flattenedLine of flattened.lines) {
     const item = currentItemsMap.get(flattenedLine.itemId);
     if (!item) {
@@ -360,46 +347,11 @@ async function syncItemsForManualStockChange(params: {
       where: { id: item.id },
       data: { qtyOnHand: nextItemQty },
     });
-
-    stockMovementRows.push({
-      itemId: item.id,
-      deltaQty: itemDeltaQty,
-      reason: 'MANUAL_ADJUSTMENT',
-      referenceType: 'MANUAL_ADJUSTMENT',
-      referenceId: movementReferenceId,
-      note:
-        qtyStockDelta.gt(0)
-          ? `[PRODUTO_ESTOQUE] Consumo automatico por aumento de estoque do ${getProductKindLabel(product.kind)} "${product.name}" (+${decimalToString(qtyStockDelta) ?? '0'} un)`
-          : `[PRODUTO_ESTOQUE] Devolucao automatica por reducao de estoque do ${getProductKindLabel(product.kind)} "${product.name}" (-${decimalToString(qtyStockDelta.abs()) ?? '0'} un)`,
-      createdByUserId: actorSub,
-    });
-  }
-
-  if (stockMovementRows.length > 0) {
-    await tx.stockMovement.createMany({
-      data: stockMovementRows,
-    });
   }
 }
 
 export class ProductsService {
   constructor(private readonly productsRepository: ProductsRepository) {}
-
-  private async generateUniqueMovementReferenceId(tx: Prisma.TransactionClient): Promise<string> {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = buildMovementReferenceCandidate();
-      const existing = await tx.stockMovement.findFirst({
-        where: { referenceId: candidate },
-        select: { id: true },
-      });
-
-      if (!existing) {
-        return candidate;
-      }
-    }
-
-    throw new Error('Failed to generate unique stock movement reference id');
-  }
 
   async list(query: ProductListQuery, expectedKind: ProductKind = 'FINAL') {
     const products = await this.productsRepository.list({
@@ -470,7 +422,7 @@ export class ProductsService {
     return serializeProduct(product);
   }
 
-  async update(id: string, input: ProductUpdateBody, actor: JwtUserPayload, expectedKind: ProductKind = 'FINAL') {
+  async update(id: string, input: ProductUpdateBody, _actor: JwtUserPayload, expectedKind: ProductKind = 'FINAL') {
     const product = await this.productsRepository.transaction(async (tx) => {
       const existing = await tx.product.findUnique({
         where: { id },
@@ -492,10 +444,8 @@ export class ProductsService {
         ensureExpectedKind(productWithBom, expectedKind);
         await syncItemsForManualStockChange({
           tx,
-          generateUniqueMovementReferenceId: (client) => this.generateUniqueMovementReferenceId(client),
           product: productWithBom,
           qtyStockDelta,
-          actorSub: actor.sub,
         });
       }
 
@@ -515,22 +465,113 @@ export class ProductsService {
     return serializeProduct(product);
   }
 
-  async remove(id: string, expectedKind: ProductKind = 'FINAL') {
-    const existing = await this.productsRepository.getById(id);
-    if (!existing) {
-      throw appErrors.notFound('Product not found');
-    }
-    ensureExpectedKind(existing, expectedKind);
+  async remove(
+    id: string,
+    expectedKind: ProductKind = 'FINAL',
+    options?: { forceCascadeUsageDelete?: boolean },
+  ) {
+    const product = await this.productsRepository.transaction(async (tx) => {
+      const existing = await tx.product.findUnique({
+        where: { id },
+        include: {
+          bomItems: {
+            include: { item: true },
+            orderBy: [{ item: { name: 'asc' } }],
+          },
+          bomIntermediateProducts: {
+            include: {
+              intermediateProduct: {
+                include: {
+                  bomItems: {
+                    include: { item: true },
+                    orderBy: [{ item: { name: 'asc' } }],
+                  },
+                },
+              },
+            },
+            orderBy: [{ intermediateProduct: { name: 'asc' } }],
+          },
+          usedAsIntermediateIn: {
+            include: {
+              product: {
+                select: { id: true, name: true, sku: true, kind: true },
+              },
+            },
+          },
+        },
+      });
 
-    try {
-      const product = await this.productsRepository.delete(id);
-      return serializeProduct(product);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-        throw appErrors.conflict('Produto nao pode ser removido porque possui ordens/movimentacoes/BOM vinculadas');
+      if (!existing) {
+        throw appErrors.notFound('Product not found');
       }
-      throw error;
-    }
+      ensureExpectedKind(existing, expectedKind);
+
+      if (
+        existing.kind === 'INTERMEDIATE' &&
+        existing.usedAsIntermediateIn.length > 0 &&
+        !options?.forceCascadeUsageDelete
+      ) {
+        throw new AppError(
+          409,
+          'CONFLICT',
+          'Produto intermediario esta vinculado a produto(s) final(is). Confirme para remover os vinculos e deletar.',
+          {
+            requiresConfirmation: 'INTERMEDIATE_USED_IN_FINAL',
+            usageCount: existing.usedAsIntermediateIn.length,
+            usedByProducts: existing.usedAsIntermediateIn.map((link) => ({
+              id: link.product.id,
+              name: link.product.name,
+              sku: link.product.sku,
+            })),
+          },
+        );
+      }
+
+      if (existing.qtyInStock.gt(0)) {
+        await syncItemsForManualStockChange({
+          tx,
+          product: existing,
+          qtyStockDelta: existing.qtyInStock.neg(),
+        });
+      }
+
+      if (existing.kind === 'INTERMEDIATE') {
+        await tx.productBomIntermediateProduct.deleteMany({
+          where: { intermediateProductId: existing.id },
+        });
+      }
+
+      const productOrders = await tx.productOrder.findMany({
+        where: { productId: existing.id },
+        select: { id: true, reversalOfOrderId: true },
+      });
+      const productOrderIds = productOrders.map((order) => order.id);
+
+      if (productOrderIds.length > 0) {
+        await tx.stockMovement.deleteMany({
+          where: {
+            referenceType: 'PRODUCT_ORDER',
+            referenceId: { in: productOrderIds },
+          },
+        });
+
+        await tx.productOrder.deleteMany({
+          where: {
+            productId: existing.id,
+            reversalOfOrderId: { not: null },
+          },
+        });
+        await tx.productOrder.deleteMany({
+          where: { productId: existing.id },
+        });
+      }
+
+      return tx.product.delete({
+        where: { id: existing.id },
+      });
+    });
+
+    return serializeProduct(product);
   }
 
   async replaceBom(productId: string, input: ProductBomReplaceBody, expectedKind: ProductKind = 'FINAL') {

@@ -15,6 +15,13 @@ export const productIdParamsSchema = z.object({
   id: z.string().min(1),
 });
 
+export const productDeleteQuerySchema = z.object({
+  forceCascadeUsageDelete: z
+    .union([z.literal('true'), z.literal('false')])
+    .optional()
+    .transform((value) => value === 'true'),
+});
+
 export const productCreateBodySchema = z.object({
   name: z.string().min(1).max(150),
   sku: optionalSkuSchema,
@@ -68,3 +75,4 @@ export const productBomReplaceBodySchema = z.object({
 });
 
 export type ProductBomReplaceBody = z.infer<typeof productBomReplaceBodySchema>;
+export type ProductDeleteQuery = z.infer<typeof productDeleteQuerySchema>;

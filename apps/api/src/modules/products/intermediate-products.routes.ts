@@ -6,6 +6,7 @@ import { ProductsService } from './products.service';
 import {
   productBomReplaceBodySchema,
   productCreateBodySchema,
+  productDeleteQuerySchema,
   productIdParamsSchema,
   productListQuerySchema,
   productUpdateBodySchema,
@@ -46,9 +47,10 @@ export const intermediateProductsRoutes: FastifyPluginAsync = async (fastify) =>
 
   fastify.delete('/intermediate-products/:id', async (request) => {
     const params = parseWithSchema(productIdParamsSchema, request.params);
+    const query = parseWithSchema(productDeleteQuerySchema, request.query);
     const service = new ProductsService(new ProductsRepository(fastify.prisma));
     return {
-      data: await service.remove(params.id, 'INTERMEDIATE'),
+      data: await service.remove(params.id, 'INTERMEDIATE', { forceCascadeUsageDelete: query.forceCascadeUsageDelete }),
     };
   });
 

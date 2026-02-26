@@ -320,7 +320,7 @@ describe('ProductsService.update (manual qtyInStock)', () => {
       }
     ).mock.calls;
     expect(itemUpdateCalls[0]?.[0]?.data?.qtyOnHand.toString()).toBe('4');
-    expect(tx.stockMovement.createMany).toHaveBeenCalled();
+    expect(tx.stockMovement.createMany).not.toHaveBeenCalled();
     expect(result.qtyInStock).toBe('3');
   });
 
@@ -358,7 +358,7 @@ describe('ProductsService.update (manual qtyInStock)', () => {
     ).mock.calls;
     expect(itemUpdateCalls[0]?.[0]?.where?.id).toBe('item_modem_chip');
     expect(itemUpdateCalls[0]?.[0]?.data?.qtyOnHand.toString()).toBe('76');
-    expect(tx.stockMovement.createMany).toHaveBeenCalled();
+    expect(tx.stockMovement.createMany).not.toHaveBeenCalled();
   });
 
   it('returns BOM items when decreasing stock of intermediate product', async () => {
@@ -385,11 +385,7 @@ describe('ProductsService.update (manual qtyInStock)', () => {
     expect(itemUpdateCalls[0]?.[0]?.where?.id).toBe('item_chip');
     expect(itemUpdateCalls[0]?.[0]?.data?.qtyOnHand.toString()).toBe('10');
 
-    const movementCreateManyCalls = (
-      tx.stockMovement.createMany as unknown as { mock: { calls: Array<Array<{ data: Array<{ deltaQty: Prisma.Decimal; note: string }> }>> } }
-    ).mock.calls;
-    expect(movementCreateManyCalls[0]?.[0]?.data?.[0]?.deltaQty.toString()).toBe('4');
-    expect(movementCreateManyCalls[0]?.[0]?.data?.[0]?.note).toContain('Devolucao automatica');
+    expect(tx.stockMovement.createMany).not.toHaveBeenCalled();
   });
 
   it('returns nested intermediate BOM items when decreasing stock of final product partially', async () => {

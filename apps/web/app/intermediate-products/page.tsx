@@ -81,6 +81,12 @@ type ParsedSourceNote = {
   sourceText: string | null;
 };
 
+type IntermediateDeleteCascadeWarningState = {
+  product: ProductRecord;
+  usageCount: number;
+  usedByProducts: Array<{ id: string; name: string; sku: string }>;
+};
+
 function parseSourceAndNote(note: string | null): ParsedSourceNote {
   if (!note) {
     return { sourceText: null };
@@ -146,6 +152,7 @@ export default function IntermediateProductsPage() {
   const [movementDialogRows, setMovementDialogRows] = useState<MovementSummaryRow[]>([]);
   const [movementDialogLoading, setMovementDialogLoading] = useState(false);
   const [movementDialogError, setMovementDialogError] = useState<string | null>(null);
+  const [deleteCascadeWarning, setDeleteCascadeWarning] = useState<IntermediateDeleteCascadeWarningState | null>(null);
 
   const bomItemOptions = useMemo(() => items, [items]);
   const intermediateBomOptions = useMemo(
@@ -300,7 +307,10 @@ export default function IntermediateProductsPage() {
     }
   }
 
-  async function deleteProduct(id: string) {
+  async function deleteProduct(
+    product: ProductRecord,
+    options?: { forceCascadeUsageDelete?: boolean },
+  ) {
     if (!token) {
       return;
     }
@@ -308,9 +318,11 @@ export default function IntermediateProductsPage() {
     setError(null);
     setSuccess(null);
     try {
-      await apiRequest<{ data: ProductRecord }>(`/intermediate-products/${id}`, { method: 'DELETE', token });
+      const query = options?.forceCascadeUsageDelete ? '?forceCascadeUsageDelete=true' : '';
+      await apiRequest<{ data: ProductRecord }>(`/intermediate-products/${product.id}${query}`, { method: 'DELETE', token });
       setSuccess('Produto intermediario removido.');
-      if (selectedProductId === id) {
+      setDeleteCascadeWarning(null);
+      if (selectedProductId === product.id) {
         setSelectedProductId(null);
         setDetail(null);
         setBomLines([]);
@@ -318,6 +330,26 @@ export default function IntermediateProductsPage() {
       }
       await loadProducts();
     } catch (caughtError) {
+      if (
+        caughtError instanceof ApiError &&
+        caughtError.statusCode === 409 &&
+        !options?.forceCascadeUsageDelete &&
+        (caughtError.details as { requiresConfirmation?: string } | undefined)?.requiresConfirmation ===
+          'INTERMEDIATE_USED_IN_FINAL'
+      ) {
+        const details = caughtError.details as
+          | {
+              usageCount?: number;
+              usedByProducts?: Array<{ id: string; name: string; sku: string }>;
+            }
+          | undefined;
+        setDeleteCascadeWarning({
+          product,
+          usageCount: details?.usageCount ?? 0,
+          usedByProducts: details?.usedByProducts ?? [],
+        });
+        return;
+      }
       setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao remover produto');
     }
   }
@@ -440,7 +472,22 @@ export default function IntermediateProductsPage() {
 
     setSaving(true);
     try {
-      await deleteProduct(deleteDialog.product.id);
+      await deleteProduct(deleteDialog.product);
+      setDeleteDialog(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleConfirmCascadeDelete() {
+    if (!deleteCascadeWarning) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteProduct(deleteCascadeWarning.product, { forceCascadeUsageDelete: true });
       setDeleteDialog(null);
     } finally {
       setSaving(false);
@@ -922,7 +969,7 @@ export default function IntermediateProductsPage() {
               : null
           }
           totalValueUnit="componentes"
-          allModeDescription="Deletar tudo tenta excluir o cadastro do produto. Se houver ordens/movimentacoes vinculadas, o sistema bloqueará a exclusão."
+          allModeDescription="Deletar tudo exclui o cadastro e remove vínculos/ordens relacionados. Se estiver vinculado em produto final, será solicitado confirmar."
           onClose={closeDeleteDialog}
           onQuantityChange={(value) =>
             setDeleteDialog((current) => (current ? { ...current, qty: value } : current))
@@ -930,6 +977,72 @@ export default function IntermediateProductsPage() {
           onConfirmQuantity={handleDeleteDialogQuantity}
           onConfirmDeleteAll={handleDeleteDialogAll}
         />
+        {deleteCascadeWarning ? (
+          <div
+            className="modal-overlay"
+            role="presentation"
+            onClick={() => {
+              if (!saving) setDeleteCascadeWarning(null);
+            }}
+          >
+            <div
+              className="modal-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-intermediate-warning-title"
+              style={{ width: 'min(640px, 100%)' }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <div>
+                  <h3 id="delete-intermediate-warning-title">Aviso de vínculo em produto final</h3>
+                  <p className="small modal-subtitle" style={{ marginBottom: 0 }}>
+                    {deleteCascadeWarning.product.name} ({deleteCascadeWarning.product.sku})
+                  </p>
+                </div>
+              </div>
+              <div className="modal-body-scroll">
+                <p className="small" style={{ marginTop: 0 }}>
+                  Este produto intermediário está sendo usado em {deleteCascadeWarning.usageCount} produto(s) final(is).
+                  Se continuar, os vínculos serão removidos e o produto intermediário será deletado.
+                </p>
+                {deleteCascadeWarning.usedByProducts.length > 0 ? (
+                  <div className="table-wrap" style={{ marginBottom: '0.75rem' }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Produto final</th>
+                          <th>SKU</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deleteCascadeWarning.usedByProducts.map((linked) => (
+                          <tr key={linked.id}>
+                            <td>{linked.name}</td>
+                            <td>{linked.sku}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+                <div className="actions">
+                  <button
+                    type="button"
+                    className="button ghost"
+                    disabled={saving}
+                    onClick={() => setDeleteCascadeWarning(null)}
+                  >
+                    Cancelar
+                  </button>
+                  <button type="button" className="button" disabled={saving} onClick={handleConfirmCascadeDelete}>
+                    {saving ? 'Processando...' : 'OK'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <MovementSummaryModal
           open={movementDialogProduct != null}
           title="Movimentacoes do produto intermediario"
