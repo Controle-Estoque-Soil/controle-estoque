@@ -269,6 +269,11 @@ a {
   line-height: 1.1;
 }
 
+.movement-detail-button {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 .button.ghost.active-pill {
   background: rgba(21, 128, 61, 0.08);
   border-color: rgba(21, 128, 61, 0.24);

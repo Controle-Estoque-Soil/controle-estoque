@@ -486,7 +486,7 @@ export default function MovementsPage() {
                           {isOrderMovement ? (
                             <button
                               type="button"
-                              className="button ghost compact"
+                              className="button ghost compact movement-detail-button"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 void openMovementDetail(movement);
