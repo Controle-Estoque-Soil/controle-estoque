@@ -287,14 +287,16 @@ a {
 }
 
 .page-header > .actions {
-  flex: 1 1 360px;
+  flex: 0 1 420px;
+  width: min(420px, 100%);
+  margin-left: auto;
   justify-content: flex-end;
   align-items: center;
   flex-wrap: nowrap;
 }
 
 .page-header > .actions .input {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   width: auto;
   min-width: 0;
 }
