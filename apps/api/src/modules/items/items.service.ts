@@ -5,6 +5,7 @@ import { appErrors } from '../../core/app-error';
 import type { JwtUserPayload } from '../../types/auth';
 import { decimalToString, toDecimal } from '../../utils/decimal';
 import type { ItemCreateBody, ItemListQuery, ItemUpdateBody, StockAdjustmentBody } from './items.schemas';
+import type { ItemPurchaseSourceRecordInput } from './items.repository';
 import { ItemsRepository } from './items.repository';
 
 export interface ItemResponse {
@@ -14,10 +15,18 @@ export interface ItemResponse {
   unit: string;
   unitPrice: string;
   purchaseLeadTimeDays: string | null;
+  purchaseSources: ItemPurchaseSourceResponse[];
   qtyOnHand: string;
   minQty: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ItemPurchaseSourceResponse {
+  id: string;
+  source: string | null;
+  price: string | null;
+  sortOrder: number;
 }
 
 export interface ItemMovementResponse {
@@ -53,6 +62,26 @@ function generateAutoSku(prefix: 'ITM'): string {
   return `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 }
 
+function normalizePurchaseSourceInput(
+  input: Array<{ source?: string; price?: string }> | undefined,
+): ItemPurchaseSourceRecordInput[] | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  return input
+    .map((row, index) => {
+      const source = row.source?.trim() || null;
+      const price = row.price ? toDecimal(row.price) : null;
+      return {
+        source,
+        price,
+        sortOrder: index,
+      };
+    })
+    .filter((row) => row.source != null || row.price != null);
+}
+
 function serializeItem(item: {
   id: string;
   name: string;
@@ -64,6 +93,12 @@ function serializeItem(item: {
   minQty: Prisma.Decimal | null;
   createdAt: Date;
   updatedAt: Date;
+  purchaseSources?: Array<{
+    id: string;
+    source: string | null;
+    price: Prisma.Decimal | null;
+    sortOrder: number;
+  }>;
 }): ItemResponse {
   return {
     id: item.id,
@@ -72,6 +107,12 @@ function serializeItem(item: {
     unit: item.unit,
     unitPrice: decimalToString(item.unitPrice) ?? '0',
     purchaseLeadTimeDays: decimalToString(item.purchaseLeadTimeDays),
+    purchaseSources: (item.purchaseSources ?? []).map((source) => ({
+      id: source.id,
+      source: source.source,
+      price: decimalToString(source.price),
+      sortOrder: source.sortOrder,
+    })),
     qtyOnHand: decimalToString(item.qtyOnHand) ?? '0',
     minQty: decimalToString(item.minQty),
     createdAt: item.createdAt.toISOString(),
@@ -166,6 +207,7 @@ export class ItemsService {
           purchaseLeadTimeDays,
           qtyOnHand,
           minQty,
+          purchaseSources: normalizePurchaseSourceInput(input.purchaseSources),
         },
         tx,
       );
@@ -207,6 +249,7 @@ export class ItemsService {
           : input.purchaseLeadTimeDays === null
             ? null
             : toDecimal(input.purchaseLeadTimeDays),
+      purchaseSources: normalizePurchaseSourceInput(input.purchaseSources),
       minQty:
         input.minQty === undefined
           ? undefined

@@ -14,6 +14,15 @@ const optionalSkuSchema = z
   .union([z.string().trim().max(80), z.literal('')])
   .optional();
 
+const itemPurchaseSourceInputSchema = z
+  .object({
+    source: z.string().trim().max(500).optional(),
+    price: nonNegativeDecimalStringSchema.optional(),
+  })
+  .refine((value) => Boolean(value.source?.trim() || value.price), {
+    message: 'Cada local de compra precisa de um local/link ou preco',
+  });
+
 export const itemIdParamsSchema = z.object({
   id: z.string().min(1),
 });
@@ -26,6 +35,7 @@ export const itemCreateBodySchema = z.object({
   purchaseLeadTimeDays: nonNegativeDecimalStringSchema.optional(),
   qtyOnHand: nonNegativeDecimalStringSchema.default('0'),
   minQty: nonNegativeDecimalStringSchema,
+  purchaseSources: z.array(itemPurchaseSourceInputSchema).max(50).optional(),
 });
 
 export type ItemCreateBody = z.infer<typeof itemCreateBodySchema>;
@@ -38,6 +48,7 @@ export const itemUpdateBodySchema = z
     unitPrice: nonNegativeDecimalStringSchema.optional(),
     purchaseLeadTimeDays: nonNegativeDecimalStringSchema.nullable().optional(),
     minQty: nonNegativeDecimalStringSchema.nullable().optional(),
+    purchaseSources: z.array(itemPurchaseSourceInputSchema).max(50).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, 'At least one field is required');
 

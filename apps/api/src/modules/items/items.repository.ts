@@ -11,6 +11,7 @@ export interface ItemCreateRecordInput {
   purchaseLeadTimeDays?: Prisma.Decimal | null;
   qtyOnHand: Prisma.Decimal;
   minQty?: Prisma.Decimal | null;
+  purchaseSources?: ItemPurchaseSourceRecordInput[];
 }
 
 export interface ItemUpdateRecordInput {
@@ -20,6 +21,13 @@ export interface ItemUpdateRecordInput {
   unitPrice?: Prisma.Decimal;
   purchaseLeadTimeDays?: Prisma.Decimal | null;
   minQty?: Prisma.Decimal | null;
+  purchaseSources?: ItemPurchaseSourceRecordInput[];
+}
+
+export interface ItemPurchaseSourceRecordInput {
+  source?: string | null;
+  price?: Prisma.Decimal | null;
+  sortOrder: number;
 }
 
 export interface MovementCreateRecordInput {
@@ -71,6 +79,11 @@ export class ItemsRepository {
             }
           : {}),
       },
+      include: {
+        purchaseSources: {
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
       orderBy: [{ name: 'asc' }],
     });
   }
@@ -78,6 +91,11 @@ export class ItemsRepository {
   getById(id: string) {
     return this.prisma.item.findUnique({
       where: { id },
+      include: {
+        purchaseSources: {
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
     });
   }
 
@@ -85,6 +103,9 @@ export class ItemsRepository {
     return this.prisma.item.findUnique({
       where: { id },
       include: {
+        purchaseSources: {
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
         movements: {
           orderBy: { createdAt: 'desc' },
           take: 50,
@@ -106,6 +127,20 @@ export class ItemsRepository {
         purchaseLeadTimeDays: data.purchaseLeadTimeDays ?? null,
         qtyOnHand: data.qtyOnHand,
         minQty: data.minQty ?? null,
+        purchaseSources: data.purchaseSources
+          ? {
+              create: data.purchaseSources.map((source) => ({
+                source: source.source ?? null,
+                price: source.price ?? null,
+                sortOrder: source.sortOrder,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        purchaseSources: {
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
       },
     });
   }
@@ -113,13 +148,36 @@ export class ItemsRepository {
   update(id: string, data: ItemUpdateRecordInput, db: DbClient = this.prisma) {
     return db.item.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        purchaseSources:
+          data.purchaseSources === undefined
+            ? undefined
+            : {
+                deleteMany: {},
+                create: data.purchaseSources.map((source) => ({
+                  source: source.source ?? null,
+                  price: source.price ?? null,
+                  sortOrder: source.sortOrder,
+                })),
+              },
+      },
+      include: {
+        purchaseSources: {
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
     });
   }
 
   delete(id: string) {
     return this.prisma.item.delete({
       where: { id },
+      include: {
+        purchaseSources: {
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
     });
   }
 

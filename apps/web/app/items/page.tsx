@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AppShell, RequireAuth } from '@/components/app-shell';
 import { useAuth } from '@/components/auth-provider';
 import { DeleteActionDialog } from '@/components/delete-action-dialog';
+import { ItemPurchaseSourcesModal, type ItemPurchaseSourceModalRow } from '@/components/item-purchase-sources-modal';
 import { MovementSummaryModal, type MovementSummaryRow } from '@/components/movement-summary-modal';
 import { apiRequest, ApiError } from '@/lib/api';
 import { formatDateTime, formatDecimal, formatMovementReason, formatUserDisplayName } from '@/lib/format';
@@ -18,6 +19,12 @@ type ItemRecord = {
   unit: string;
   unitPrice: string;
   purchaseLeadTimeDays: string | null;
+  purchaseSources: Array<{
+    id: string;
+    source: string | null;
+    price: string | null;
+    sortOrder: number;
+  }>;
   qtyOnHand: string;
   minQty: string | null;
   createdAt: string;
@@ -52,6 +59,11 @@ type ItemMovementListRecord = {
 type ParsedSourceNote = {
   sourceText: string | null;
   displayNote: string | null;
+};
+
+type PurchaseSourceFormRow = {
+  source: string;
+  price: string;
 };
 
 function parseSourceAndNote(note: string | null): ParsedSourceNote {
@@ -125,9 +137,23 @@ function emptyItemForm() {
     unit: 'un',
     unitPrice: '0',
     purchaseLeadTimeDays: '',
+    purchaseSources: [] as PurchaseSourceFormRow[],
     qtyOnHand: '0',
     minQty: '',
   };
+}
+
+function emptyPurchaseSourceRow(): PurchaseSourceFormRow {
+  return { source: '', price: '' };
+}
+
+function sanitizePurchaseSources(rows: PurchaseSourceFormRow[]): PurchaseSourceFormRow[] {
+  return rows
+    .map((row) => ({
+      source: row.source.trim(),
+      price: row.price.trim(),
+    }))
+    .filter((row) => row.source || row.price);
 }
 
 export default function ItemsPage() {
@@ -148,8 +174,18 @@ export default function ItemsPage() {
   const [movementDialogRows, setMovementDialogRows] = useState<MovementSummaryRow[]>([]);
   const [movementDialogLoading, setMovementDialogLoading] = useState(false);
   const [movementDialogError, setMovementDialogError] = useState<string | null>(null);
+  const [purchaseSourcesDialogItem, setPurchaseSourcesDialogItem] = useState<ItemRecord | null>(null);
 
   const selectedItem = useMemo(() => items.find((item) => item.id === selectedItemId) ?? null, [items, selectedItemId]);
+  const purchaseSourceDialogRows = useMemo<ItemPurchaseSourceModalRow[]>(
+    () =>
+      (purchaseSourcesDialogItem?.purchaseSources ?? []).map((source) => ({
+        id: source.id,
+        source: source.source,
+        price: source.price ? formatDecimal(source.price) : null,
+      })),
+    [purchaseSourcesDialogItem],
+  );
 
   async function loadItems() {
     if (!token) {
@@ -183,6 +219,11 @@ export default function ItemsPage() {
         unit: response.item.unit,
         unitPrice: response.item.unitPrice,
         purchaseLeadTimeDays: response.item.purchaseLeadTimeDays ?? '',
+        purchaseSources:
+          response.item.purchaseSources?.map((source) => ({
+            source: source.source ?? '',
+            price: source.price ?? '',
+          })) ?? [],
         qtyOnHand: response.item.qtyOnHand,
         minQty: response.item.minQty ?? '',
       });
@@ -215,6 +256,7 @@ export default function ItemsPage() {
           unit: parsed.unit,
           unitPrice: parsed.unitPrice,
           purchaseLeadTimeDays: parsed.purchaseLeadTimeDays || undefined,
+          purchaseSources: sanitizePurchaseSources(parsed.purchaseSources),
           qtyOnHand: parsed.qtyOnHand,
           minQty: parsed.minQty,
         },
@@ -253,6 +295,7 @@ export default function ItemsPage() {
           unit: parsed.unit,
           unitPrice: parsed.unitPrice,
           purchaseLeadTimeDays: parsed.purchaseLeadTimeDays === '' ? null : parsed.purchaseLeadTimeDays,
+          purchaseSources: sanitizePurchaseSources(parsed.purchaseSources),
           minQty: parsed.minQty,
         },
       });
@@ -436,6 +479,56 @@ export default function ItemsPage() {
     setMovementDialogLoading(false);
   }
 
+  function openPurchaseSourcesDialog(item: ItemRecord) {
+    setPurchaseSourcesDialogItem(item);
+  }
+
+  function closePurchaseSourcesDialog() {
+    setPurchaseSourcesDialogItem(null);
+  }
+
+  function addCreatePurchaseSourceRow() {
+    setCreateForm((current) => ({
+      ...current,
+      purchaseSources: [...current.purchaseSources, emptyPurchaseSourceRow()],
+    }));
+  }
+
+  function addEditPurchaseSourceRow() {
+    setEditForm((current) => ({
+      ...current,
+      purchaseSources: [...current.purchaseSources, emptyPurchaseSourceRow()],
+    }));
+  }
+
+  function updateCreatePurchaseSourceRow(index: number, patch: Partial<PurchaseSourceFormRow>) {
+    setCreateForm((current) => ({
+      ...current,
+      purchaseSources: current.purchaseSources.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)),
+    }));
+  }
+
+  function updateEditPurchaseSourceRow(index: number, patch: Partial<PurchaseSourceFormRow>) {
+    setEditForm((current) => ({
+      ...current,
+      purchaseSources: current.purchaseSources.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)),
+    }));
+  }
+
+  function removeCreatePurchaseSourceRow(index: number) {
+    setCreateForm((current) => ({
+      ...current,
+      purchaseSources: current.purchaseSources.filter((_, rowIndex) => rowIndex !== index),
+    }));
+  }
+
+  function removeEditPurchaseSourceRow(index: number) {
+    setEditForm((current) => ({
+      ...current,
+      purchaseSources: current.purchaseSources.filter((_, rowIndex) => rowIndex !== index),
+    }));
+  }
+
   return (
     <RequireAuth>
       <AppShell>
@@ -466,9 +559,10 @@ export default function ItemsPage() {
                   <th>Item</th>
                   <th>SKU</th>
                   <th>Unidade</th>
-                  <th>Preço</th>
+                  <th>Preço médio</th>
                   <th>Estoque</th>
                   <th>Tempo compra (dias)</th>
+                  <th>Onde comprar</th>
                   <th>Mínimo</th>
                   <th>Movimentacoes</th>
                   <th>Ações</th>
@@ -477,7 +571,7 @@ export default function ItemsPage() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={9}>Nenhum item cadastrado.</td>
+                    <td colSpan={10}>Nenhum item cadastrado.</td>
                   </tr>
                 ) : (
                   items.map((item) => {
@@ -490,6 +584,11 @@ export default function ItemsPage() {
                         <td>{formatDecimal(item.unitPrice)}</td>
                         <td>{formatDecimal(item.qtyOnHand)}</td>
                         <td>{item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-'}</td>
+                        <td>
+                          <button type="button" className="button ghost compact" onClick={() => openPurchaseSourcesDialog(item)}>
+                            Ver mais
+                          </button>
+                        </td>
                         <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
                         <td>
                           <button type="button" className="button ghost compact" onClick={() => void openItemMovementsDialog(item)}>
@@ -539,7 +638,7 @@ export default function ItemsPage() {
                 <input id="create-item-unit" className="input" value={createForm.unit} onChange={(e) => setCreateForm({ ...createForm, unit: e.target.value })} />
               </div>
               <div className="field">
-                <label htmlFor="create-item-unit-price">Preço unitário</label>
+                <label htmlFor="create-item-unit-price">Preço unitário médio</label>
                 <input id="create-item-unit-price" className="input" value={createForm.unitPrice} onChange={(e) => setCreateForm({ ...createForm, unitPrice: e.target.value })} />
               </div>
               <div className="field">
@@ -559,6 +658,39 @@ export default function ItemsPage() {
               <div className="field">
                 <label htmlFor="create-item-min-qty">Estoque minimo</label>
                 <input id="create-item-min-qty" className="input" value={createForm.minQty} onChange={(e) => setCreateForm({ ...createForm, minQty: e.target.value })} />
+              </div>
+              <div className="field full">
+                <div className="list-field-header">
+                  <label style={{ margin: 0 }}>Onde comprar (opcional)</label>
+                  <button type="button" className="button ghost compact" onClick={addCreatePurchaseSourceRow}>
+                    Adicionar local
+                  </button>
+                </div>
+                {createForm.purchaseSources.length === 0 ? (
+                  <p className="small">Nenhum local/link cadastrado. Opcional.</p>
+                ) : (
+                  <div className="purchase-source-list">
+                    {createForm.purchaseSources.map((row, index) => (
+                      <div key={`create-source-${index}`} className="purchase-source-row">
+                        <input
+                          className="input"
+                          placeholder="Local ou link de compra (opcional)"
+                          value={row.source}
+                          onChange={(e) => updateCreatePurchaseSourceRow(index, { source: e.target.value })}
+                        />
+                        <input
+                          className="input"
+                          placeholder="Preco medio no local (opcional)"
+                          value={row.price}
+                          onChange={(e) => updateCreatePurchaseSourceRow(index, { price: e.target.value })}
+                        />
+                        <button type="button" className="button ghost compact" onClick={() => removeCreatePurchaseSourceRow(index)}>
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="actions full">
                 <button className="button" type="submit" disabled={saving}>
@@ -593,7 +725,7 @@ export default function ItemsPage() {
                     <input className="input" value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} />
                   </div>
                   <div className="field">
-                    <label>Preço unitário</label>
+                    <label>Preço unitário médio</label>
                     <input className="input" value={editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} />
                   </div>
                   <div className="field">
@@ -612,6 +744,39 @@ export default function ItemsPage() {
                   <div className="field">
                     <label>Estoque minimo</label>
                     <input className="input" value={editForm.minQty} onChange={(e) => setEditForm({ ...editForm, minQty: e.target.value })} />
+                  </div>
+                  <div className="field full">
+                    <div className="list-field-header">
+                      <label style={{ margin: 0 }}>Onde comprar (opcional)</label>
+                      <button type="button" className="button ghost compact" onClick={addEditPurchaseSourceRow}>
+                        Adicionar local
+                      </button>
+                    </div>
+                    {editForm.purchaseSources.length === 0 ? (
+                      <p className="small">Nenhum local/link cadastrado.</p>
+                    ) : (
+                      <div className="purchase-source-list">
+                        {editForm.purchaseSources.map((row, index) => (
+                          <div key={`edit-source-${index}`} className="purchase-source-row">
+                            <input
+                              className="input"
+                              placeholder="Local ou link de compra (opcional)"
+                              value={row.source}
+                              onChange={(e) => updateEditPurchaseSourceRow(index, { source: e.target.value })}
+                            />
+                            <input
+                              className="input"
+                              placeholder="Preco medio no local (opcional)"
+                              value={row.price}
+                              onChange={(e) => updateEditPurchaseSourceRow(index, { price: e.target.value })}
+                            />
+                            <button type="button" className="button ghost compact" onClick={() => removeEditPurchaseSourceRow(index)}>
+                              Remover
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="actions full">
                     <button className="button secondary" type="submit" disabled={saving}>
@@ -728,6 +893,13 @@ export default function ItemsPage() {
           rows={movementDialogRows}
           emptyMessage="Nenhuma movimentacao direta deste item encontrada."
           onClose={closeItemMovementsDialog}
+        />
+        <ItemPurchaseSourcesModal
+          open={purchaseSourcesDialogItem != null}
+          title="Onde comprar"
+          subtitle={purchaseSourcesDialogItem ? `${purchaseSourcesDialogItem.name} (${purchaseSourcesDialogItem.sku})` : null}
+          rows={purchaseSourceDialogRows}
+          onClose={closePurchaseSourcesDialog}
         />
       </AppShell>
     </RequireAuth>

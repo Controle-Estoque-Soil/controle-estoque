@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+export const itemPurchaseSourceFormRowSchema = z.object({
+  source: z.string().trim().max(500, 'Local/link invalido').default(''),
+  price: z.union([z.literal(''), z.string().regex(/^\d+(\.\d+)?$/, 'Preco medio invalido')]).default(''),
+});
+
 export const itemFormSchema = z.object({
   name: z.string().min(1, 'Nome e obrigatorio'),
   sku: z.string().trim().max(80, 'SKU invalido'),
@@ -8,6 +13,7 @@ export const itemFormSchema = z.object({
   purchaseLeadTimeDays: z.union([z.literal(''), z.string().regex(/^\d+(\.\d+)?$/, 'Tempo medio invalido')]).default(''),
   qtyOnHand: z.string().regex(/^\d+(\.\d+)?$/, 'Quantidade invalida').default('0'),
   minQty: z.string().regex(/^\d+(\.\d+)?$/, 'Estoque minimo invalido'),
+  purchaseSources: z.array(itemPurchaseSourceFormRowSchema).default([]),
 });
 
 export const productFormSchema = z.object({

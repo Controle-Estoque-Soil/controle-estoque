@@ -58,11 +58,26 @@ model Item {
   createdAt    DateTime           @default(now()) @map("created_at")
   updatedAt    DateTime           @updatedAt @map("updated_at")
   bomItems     ProductBomItem[]
+  purchaseSources ItemPurchaseSource[]
   movements    StockMovement[]
   orderLines   ProductOrderLine[]
 
   @@index([name])
   @@map("items")
+}
+
+model ItemPurchaseSource {
+  id        String    @id @default(cuid())
+  itemId     String   @map("item_id")
+  source     String?  @db.Text
+  price      Decimal? @db.Decimal(18, 6)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, sortOrder])
+  @@map("item_purchase_sources")
 }
 
 model Product {
