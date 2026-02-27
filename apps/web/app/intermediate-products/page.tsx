@@ -144,7 +144,10 @@ export default function IntermediateProductsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [duplicateSourceId, setDuplicateSourceId] = useState('');
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ product: ProductRecord; qty: string } | null>(null);
   const [capacityDialogProduct, setCapacityDialogProduct] = useState<ProductRecord | null>(null);
@@ -533,6 +536,80 @@ export default function IntermediateProductsPage() {
     setIntermediateBomLines((current) => [...current, { intermediateProductId: '', qtyRequired: '1' }]);
   }
 
+  function openDuplicateDialog() {
+    if (products.length === 0) {
+      setError('Nenhum produto intermediario disponivel para duplicar.');
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+    setDuplicateSourceId(selectedProductId ?? products[0]?.id ?? '');
+    setDuplicateDialogOpen(true);
+  }
+
+  async function handleDuplicateFromExisting() {
+    if (!token) {
+      return;
+    }
+    if (!duplicateSourceId) {
+      setError('Selecione um produto intermediario para duplicar.');
+      return;
+    }
+
+    setDuplicating(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const sourceDetail = await apiRequest<ProductDetailResponse>(`/intermediate-products/${duplicateSourceId}`, { token });
+
+      const createPayload = productFormSchema.parse({
+        name: `${sourceDetail.data.name} +`,
+        sku: '',
+        manufacturingLeadTimeDays: sourceDetail.data.manufacturingLeadTimeDays ?? '',
+        qtyInStock: '0',
+        qtySoldTotal: '0',
+      });
+
+      const created = await apiRequest<{ data: ProductRecord }>('/intermediate-products', {
+        method: 'POST',
+        token,
+        body: {
+          ...createPayload,
+          manufacturingLeadTimeDays: createPayload.manufacturingLeadTimeDays || undefined,
+        },
+      });
+
+      await apiRequest<ProductDetailResponse>(`/intermediate-products/${created.data.id}/bom`, {
+        method: 'PUT',
+        token,
+        body: {
+          items: sourceDetail.bom.map((line) => ({
+            itemId: line.itemId,
+            qtyRequired: line.qtyRequired,
+          })),
+          intermediateProducts: [],
+        },
+      });
+
+      await loadProducts();
+      const loaded = await loadDetail(created.data.id);
+      if (loaded) {
+        setDetailDialogOpen(true);
+      }
+      setDuplicateDialogOpen(false);
+      setSuccess(`Produto intermediario duplicado com sucesso a partir de "${sourceDetail.data.name}".`);
+    } catch (caughtError) {
+      if (caughtError instanceof z.ZodError) {
+        setError(caughtError.issues[0]?.message ?? 'Dados invalidos para duplicacao');
+      } else {
+        setError(caughtError instanceof ApiError ? caughtError.message : 'Falha ao duplicar produto intermediario');
+      }
+    } finally {
+      setDuplicating(false);
+    }
+  }
+
   async function openDetailDialog(id: string) {
     const loaded = await loadDetail(id);
     if (loaded) {
@@ -546,7 +623,18 @@ export default function IntermediateProductsPage() {
         <section className="panel">
           <div className="page-header">
             <div>
-              <h1 className="page-title">Produtos intermediarios</h1>
+              <div className="page-title-row">
+                <h1 className="page-title">Produtos intermediarios</h1>
+                <button
+                  type="button"
+                  className="title-plus-button"
+                  onClick={openDuplicateDialog}
+                  title="Duplicar produto intermediario existente"
+                  aria-label="Duplicar produto intermediario existente"
+                >
+                  +
+                </button>
+              </div>
               <p className="page-subtitle">Cadastro de produtos intermediarios e edicao da receita/BOM (somente itens).</p>
             </div>
             <div className="actions header-search-actions">
@@ -699,6 +787,48 @@ export default function IntermediateProductsPage() {
               </div>
             </form>
           </div>
+        </PanelModal>
+
+        <PanelModal
+          open={duplicateDialogOpen}
+          onClose={() => setDuplicateDialogOpen(false)}
+          wide={false}
+          title="Duplicar produto intermediario"
+          subtitle="Escolha um produto existente para criar uma copia com a mesma BOM."
+        >
+          <form
+            className="grid"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleDuplicateFromExisting();
+            }}
+          >
+            <div className="field">
+              <label htmlFor="duplicate-intermediate-product-source">Produto base</label>
+              <select
+                id="duplicate-intermediate-product-source"
+                className="select"
+                value={duplicateSourceId}
+                onChange={(event) => setDuplicateSourceId(event.target.value)}
+                disabled={duplicating}
+              >
+                <option value="">Selecione...</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name} ({product.sku})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="small" style={{ margin: 0 }}>
+              A copia sera criada com sufixo <strong>+</strong> no nome, SKU automatico e estoque inicial zero.
+            </p>
+            <div className="actions">
+              <button type="submit" className="button" disabled={duplicating || !duplicateSourceId}>
+                {duplicating ? 'Duplicando...' : 'Duplicar produto intermediario'}
+              </button>
+            </div>
+          </form>
         </PanelModal>
 
         <PanelModal open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} wide>
