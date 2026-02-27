@@ -45,6 +45,17 @@ export const operationsRoutes: FastifyPluginAsync = async (fastify) => {
     assertOverridePermission(fastify, request, body.allowNegativeOverride ?? false);
     const service = new OperationsService(new OperationsRepository(fastify.prisma));
     const operation = await service.execute('OUTBOUND_PRODUCT', body, request.user);
+    fastify.log.info(
+      {
+        operationId: operation.id,
+        productId: operation.product.id,
+        productKind: operation.product.kind,
+        productName: operation.product.name,
+        productQty: operation.productQty,
+        actorUserId: request.user.sub,
+      },
+      'Outbound operation confirmed; dispatching operation email',
+    );
     await outboundEmailService.sendProductOutbound({
       referenceId: operation.id,
       scopeLabel: operation.product.kind === 'INTERMEDIATE' ? 'Produto intermediario' : 'Produto',

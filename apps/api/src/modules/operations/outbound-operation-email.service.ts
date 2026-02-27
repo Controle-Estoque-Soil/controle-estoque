@@ -155,9 +155,24 @@ export class OutboundOperationEmailService {
     this.logger.warn({ reason }, 'Outbound operation email disabled');
   }
 
+  private getDebugContext() {
+    return {
+      enabled: this.config.OUTBOUND_OPERATION_EMAIL_ENABLED,
+      smtpHost: trimOrNull(this.config.SMTP_HOST) ?? 'smtp.gmail.com',
+      smtpPort: this.config.SMTP_PORT,
+      smtpSecure: this.config.SMTP_SECURE,
+      smtpUserConfigured: Boolean(trimOrNull(this.config.SMTP_USER)),
+      smtpPassConfigured: Boolean(trimOrNull(this.config.SMTP_PASS)),
+      smtpFromConfigured: Boolean(trimOrNull(this.config.SMTP_FROM)),
+      to: this.config.OUTBOUND_OPERATION_EMAIL_TO,
+      subject: this.config.OUTBOUND_OPERATION_EMAIL_SUBJECT,
+    };
+  }
+
   private getTransporter(): nodemailer.Transporter | null {
     if (!this.config.OUTBOUND_OPERATION_EMAIL_ENABLED) {
       this.transporterState = 'unavailable';
+      this.logUnavailable('OUTBOUND_OPERATION_EMAIL_ENABLED=false');
       return null;
     }
 
@@ -193,6 +208,7 @@ export class OutboundOperationEmailService {
   private getMailEnvelope() {
     const from = trimOrNull(this.config.SMTP_FROM) ?? trimOrNull(this.config.SMTP_USER);
     if (!from) {
+      this.logUnavailable('SMTP_FROM or SMTP_USER is required');
       return null;
     }
 
@@ -286,16 +302,36 @@ export class OutboundOperationEmailService {
   }
 
   async sendProductOutbound(payload: OutboundProductEmailPayload): Promise<void> {
+    this.logger.info(
+      {
+        referenceId: payload.referenceId,
+        scopeLabel: payload.scopeLabel,
+        productName: payload.productName,
+        productQty: payload.productQty,
+        ...this.getDebugContext(),
+      },
+      'Outbound product email requested',
+    );
+
     const transporter = this.getTransporter();
     const envelope = this.getMailEnvelope();
     if (!transporter || !envelope) {
+      this.logger.warn(
+        {
+          referenceId: payload.referenceId,
+          hasTransporter: Boolean(transporter),
+          hasEnvelope: Boolean(envelope),
+          ...this.getDebugContext(),
+        },
+        'Outbound product email skipped',
+      );
       return;
     }
 
     try {
       const pdf = await this.buildProductOutboundPdf(payload);
       const fileName = `saida-${sanitizeFileToken(payload.productName) || 'produto'}-${payload.referenceId}.pdf`;
-      await transporter.sendMail({
+      const sendResult = await transporter.sendMail({
         from: envelope.from,
         to: envelope.to,
         subject: envelope.subject,
@@ -308,22 +344,51 @@ export class OutboundOperationEmailService {
           },
         ],
       });
+      this.logger.info(
+        {
+          referenceId: payload.referenceId,
+          messageId: sendResult.messageId,
+          accepted: sendResult.accepted,
+          rejected: sendResult.rejected,
+        },
+        'Outbound product email sent',
+      );
     } catch (error) {
       this.logger.error({ err: error, referenceId: payload.referenceId }, 'Failed to send outbound product email');
     }
   }
 
   async sendItemOutbound(payload: OutboundItemEmailPayload): Promise<void> {
+    this.logger.info(
+      {
+        referenceId: payload.referenceId,
+        itemName: payload.itemName,
+        itemQty: payload.itemQty,
+        itemUnit: payload.itemUnit,
+        ...this.getDebugContext(),
+      },
+      'Outbound item email requested',
+    );
+
     const transporter = this.getTransporter();
     const envelope = this.getMailEnvelope();
     if (!transporter || !envelope) {
+      this.logger.warn(
+        {
+          referenceId: payload.referenceId,
+          hasTransporter: Boolean(transporter),
+          hasEnvelope: Boolean(envelope),
+          ...this.getDebugContext(),
+        },
+        'Outbound item email skipped',
+      );
       return;
     }
 
     try {
       const pdf = await this.buildItemOutboundPdf(payload);
       const fileName = `saida-${sanitizeFileToken(payload.itemName) || 'item'}-${payload.referenceId}.pdf`;
-      await transporter.sendMail({
+      const sendResult = await transporter.sendMail({
         from: envelope.from,
         to: envelope.to,
         subject: envelope.subject,
@@ -336,6 +401,15 @@ export class OutboundOperationEmailService {
           },
         ],
       });
+      this.logger.info(
+        {
+          referenceId: payload.referenceId,
+          messageId: sendResult.messageId,
+          accepted: sendResult.accepted,
+          rejected: sendResult.rejected,
+        },
+        'Outbound item email sent',
+      );
     } catch (error) {
       this.logger.error({ err: error, referenceId: payload.referenceId }, 'Failed to send outbound item email');
     }

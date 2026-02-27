@@ -68,6 +68,16 @@ export const itemsRoutes: FastifyPluginAsync = async (fastify) => {
     const service = new ItemsService(new ItemsRepository(fastify.prisma));
     const result = await service.adjustStock(params.id, body, request.user);
     if (result.directOutboundEmailPayload) {
+      fastify.log.info(
+        {
+          itemId: params.id,
+          referenceId: result.directOutboundEmailPayload.referenceId,
+          itemName: result.directOutboundEmailPayload.itemName,
+          itemQty: result.directOutboundEmailPayload.itemQty,
+          actorUserId: request.user.sub,
+        },
+        'Direct item outbound confirmed; dispatching operation email',
+      );
       await outboundEmailService.sendItemOutbound(result.directOutboundEmailPayload);
     }
     return {
