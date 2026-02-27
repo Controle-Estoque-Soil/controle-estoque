@@ -1074,67 +1074,68 @@ export default function IntermediateProductsPage() {
                   Fechar
                 </button>
               </div>
-
-              <div className="panel" style={{ padding: '0.75rem' }}>
-                <div className="small">Capacidade calculada</div>
-                <div className="card-value" style={{ fontSize: '1.25rem' }}>
-                  {formatDecimal(capacityDialogProduct.productionCapacity ?? '0')} un
-                </div>
-              </div>
-
-              {capacityDialogProduct.productionCapacityNotes && capacityDialogProduct.productionCapacityNotes.length > 0 ? (
-                <div className="alert-block warn">
-                  {capacityDialogProduct.productionCapacityNotes.map((note, index) => (
-                    <div key={`${note}-${index}`}>{note}</div>
-                  ))}
-                </div>
-              ) : null}
-
-              <div>
-                <h3 style={{ marginTop: 0 }}>Itens ordenados por limitacao (mais limitante primeiro)</h3>
-                {((capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
-                  ? capacityDialogProduct.productionCapacityItems
-                  : capacityDialogProduct.productionCapacityLimiters) &&
-                (((capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
-                  ? capacityDialogProduct.productionCapacityItems
-                  : capacityDialogProduct.productionCapacityLimiters)?.length ?? 0) > 0 ? (
-                  <div className="table-wrap">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Item</th>
-                          <th>SKU</th>
-                          <th>Estoque atual</th>
-                          <th>Necessario por produto</th>
-                          <th>Produz ate</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(
-                          (capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
-                            ? capacityDialogProduct.productionCapacityItems
-                            : capacityDialogProduct.productionCapacityLimiters ?? []
-                        ).map((limiter) => (
-                          <tr key={`${limiter.itemId}-${limiter.maxProductsFromItem}`}>
-                            <td>{limiter.itemName}</td>
-                            <td>{limiter.itemSku}</td>
-                            <td>
-                              {formatDecimal(limiter.itemQtyOnHand)} {limiter.itemUnit}
-                            </td>
-                            <td>
-                              {formatDecimal(limiter.qtyRequiredPerProduct)} {limiter.itemUnit}
-                            </td>
-                            <td>{formatDecimal(limiter.maxProductsFromItem)} un</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              <div className="modal-body-scroll capacity-modal-body">
+                <div className="panel capacity-modal-summary">
+                  <div className="small">Capacidade calculada</div>
+                  <div className="card-value" style={{ fontSize: '1.25rem' }}>
+                    {formatDecimal(capacityDialogProduct.productionCapacity ?? '0')} un
                   </div>
-                ) : (
-                  <p className="small" style={{ margin: 0 }}>
-                    Nenhum item limitante encontrado para este produto.
-                  </p>
-                )}
+                </div>
+
+                {capacityDialogProduct.productionCapacityNotes && capacityDialogProduct.productionCapacityNotes.length > 0 ? (
+                  <div className="alert-block warn">
+                    {capacityDialogProduct.productionCapacityNotes.map((note, index) => (
+                      <div key={`${note}-${index}`}>{note}</div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div>
+                  <h3 className="capacity-modal-section-title">Itens ordenados por limitacao (mais limitante primeiro)</h3>
+                  {((capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
+                    ? capacityDialogProduct.productionCapacityItems
+                    : capacityDialogProduct.productionCapacityLimiters) &&
+                  (((capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
+                    ? capacityDialogProduct.productionCapacityItems
+                    : capacityDialogProduct.productionCapacityLimiters)?.length ?? 0) > 0 ? (
+                    <div className="table-wrap">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Item</th>
+                            <th>SKU</th>
+                            <th>Estoque atual</th>
+                            <th>Necessario por produto</th>
+                            <th>Produz ate</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(
+                            (capacityDialogProduct.productionCapacityItems && capacityDialogProduct.productionCapacityItems.length > 0)
+                              ? capacityDialogProduct.productionCapacityItems
+                              : capacityDialogProduct.productionCapacityLimiters ?? []
+                          ).map((limiter) => (
+                            <tr key={`${limiter.itemId}-${limiter.maxProductsFromItem}`}>
+                              <td>{limiter.itemName}</td>
+                              <td>{limiter.itemSku}</td>
+                              <td>
+                                {formatDecimal(limiter.itemQtyOnHand)} {limiter.itemUnit}
+                              </td>
+                              <td>
+                                {formatDecimal(limiter.qtyRequiredPerProduct)} {limiter.itemUnit}
+                              </td>
+                              <td>{formatDecimal(limiter.maxProductsFromItem)} un</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="small" style={{ margin: 0 }}>
+                      Nenhum item limitante encontrado para este produto.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

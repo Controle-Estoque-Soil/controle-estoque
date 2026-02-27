@@ -666,6 +666,18 @@ a {
   overscroll-behavior: contain;
 }
 
+.capacity-modal-body {
+  gap: 0.9rem;
+}
+
+.capacity-modal-summary {
+  padding: 0.75rem;
+}
+
+.capacity-modal-section-title {
+  margin: 0 0 0.5rem;
+}
+
 .modal-card .panel.modal-panel-shell {
   border: none;
   box-shadow: none;
