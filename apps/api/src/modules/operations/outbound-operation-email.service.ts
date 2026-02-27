@@ -83,7 +83,7 @@ function sanitizeFileToken(value: string): string {
 }
 
 async function renderPdf(
-  renderer: (doc: PDFKit.PDFDocument, addPageIfNeeded: (heightNeeded: number) => void) => void,
+  renderer: (doc: PDFKit.PDFDocument, tools: PdfRenderTools) => void,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -96,44 +96,233 @@ async function renderPdf(
       },
     });
     const chunks: Buffer[] = [];
-    let y = 40;
-    const lineGap = 5;
+    let y = doc.page.margins.top;
 
-    const addPageIfNeeded = (heightNeeded: number) => {
-      const bottomLimit = doc.page.height - 40;
-      if (y + heightNeeded <= bottomLimit) {
-        return;
-      }
-      doc.addPage();
-      y = 40;
+    const tools: PdfRenderTools = {
+      margin: doc.page.margins.left,
+      contentWidth: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+      pageTop: doc.page.margins.top,
+      pageBottom: doc.page.height - doc.page.margins.bottom,
+      getY: () => y,
+      setY: (nextY: number) => {
+        y = nextY;
+        doc.y = y;
+      },
+      ensureSpace: (heightNeeded: number) => {
+        if (y + heightNeeded <= doc.page.height - doc.page.margins.bottom) {
+          return false;
+        }
+        doc.addPage();
+        y = doc.page.margins.top;
+        doc.y = y;
+        return true;
+      },
     };
-
-    const originalText = doc.text.bind(doc);
-    doc.text = ((text: string, x?: number, yInput?: number, options?: PDFKit.Mixins.TextOptions) => {
-      if (typeof yInput === 'number') {
-        y = yInput;
-      }
-      if (typeof x === 'number' && typeof yInput === 'number') {
-        originalText(text, x, yInput, options);
-      } else if (typeof x === 'number') {
-        originalText(text, x, undefined, options);
-      } else {
-        originalText(text, options as PDFKit.Mixins.TextOptions | undefined);
-      }
-      y = doc.y + lineGap;
-      return doc;
-    }) as typeof doc.text;
 
     doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
     doc.on('error', reject);
     doc.on('end', () => resolve(Buffer.concat(chunks)));
 
     try {
-      renderer(doc, addPageIfNeeded);
+      renderer(doc, tools);
       doc.end();
     } catch (error) {
       reject(error);
     }
+  });
+}
+
+type PdfRenderTools = {
+  margin: number;
+  contentWidth: number;
+  pageTop: number;
+  pageBottom: number;
+  getY: () => number;
+  setY: (nextY: number) => void;
+  ensureSpace: (heightNeeded: number) => boolean;
+};
+
+type PdfInfoRow = {
+  label: string;
+  value: string;
+};
+
+const pdfPalette = {
+  primary: '#14532d',
+  primarySoft: '#eaf7ee',
+  primaryBorder: '#b7dfc1',
+  text: '#111827',
+  muted: '#4b5563',
+  cardBackground: '#f8fbf9',
+  cardBorder: '#d6e8dc',
+  tableHeaderBackground: '#edf7f1',
+  tableHeaderBorder: '#bfdcc9',
+  tableRowBorder: '#dceae1',
+  tableRowAlt: '#fbfdfc',
+};
+
+function drawPdfHeader(doc: PDFKit.PDFDocument, tools: PdfRenderTools, generatedAt: string): void {
+  const headerHeight = 88;
+  tools.ensureSpace(headerHeight + 8);
+  const y = tools.getY();
+  const titleX = tools.margin + 16;
+  const titleWidth = tools.contentWidth - 250;
+  const dateBoxWidth = 210;
+  const dateX = tools.margin + tools.contentWidth - dateBoxWidth - 16;
+
+  doc.roundedRect(tools.margin, y, tools.contentWidth, headerHeight, 10).fillAndStroke('#f1fbf4', pdfPalette.primaryBorder);
+
+  doc.fillColor(pdfPalette.primary).font('Helvetica-Bold').fontSize(10).text('SOIL TECNOLOGIA', titleX, y + 12, { width: titleWidth });
+  doc.fillColor(pdfPalette.text).font('Helvetica-Bold').fontSize(22).text('Saida de operacao', titleX, y + 28, { width: titleWidth });
+  doc.fillColor(pdfPalette.muted).font('Helvetica').fontSize(10).text('Relatorio automatico de saida confirmada', titleX, y + 60, {
+    width: titleWidth,
+  });
+
+  doc.roundedRect(dateX, y + 12, dateBoxWidth, 64, 8).fillAndStroke('#ffffff', '#cfe8d8');
+  doc.fillColor(pdfPalette.primary).font('Helvetica-Bold').fontSize(9).text('GERADO EM', dateX + 12, y + 24, { width: dateBoxWidth - 24 });
+  doc.fillColor(pdfPalette.text).font('Helvetica-Bold').fontSize(13).text(generatedAt, dateX + 12, y + 40, { width: dateBoxWidth - 24 });
+
+  tools.setY(y + headerHeight + 14);
+}
+
+function drawInfoCard(doc: PDFKit.PDFDocument, tools: PdfRenderTools, title: string, rows: PdfInfoRow[]): void {
+  const innerPadding = 12;
+  const innerWidth = tools.contentWidth - innerPadding * 2;
+  const rowMetrics = rows.map((row) => {
+    doc.font('Helvetica-Bold').fontSize(9);
+    const labelHeight = doc.heightOfString(row.label.toUpperCase(), { width: innerWidth });
+    doc.font('Helvetica').fontSize(11);
+    const valueHeight = doc.heightOfString(row.value, { width: innerWidth });
+    return {
+      row,
+      labelHeight,
+      valueHeight,
+      totalHeight: labelHeight + valueHeight + 8,
+    };
+  });
+
+  doc.font('Helvetica-Bold').fontSize(12);
+  const titleHeight = doc.heightOfString(title, { width: innerWidth });
+  const rowsHeight = rowMetrics.reduce((acc, metric) => acc + metric.totalHeight, 0);
+  const separatorsHeight = Math.max(0, rowMetrics.length - 1) * 6;
+  const cardHeight = innerPadding + titleHeight + 10 + rowsHeight + separatorsHeight + innerPadding;
+
+  tools.ensureSpace(cardHeight + 8);
+  const y = tools.getY();
+  doc.roundedRect(tools.margin, y, tools.contentWidth, cardHeight, 8).fillAndStroke(pdfPalette.cardBackground, pdfPalette.cardBorder);
+
+  let cursorY = y + innerPadding;
+  doc.fillColor(pdfPalette.primary).font('Helvetica-Bold').fontSize(12).text(title, tools.margin + innerPadding, cursorY, {
+    width: innerWidth,
+  });
+  cursorY += titleHeight + 10;
+
+  rowMetrics.forEach((metric, index) => {
+    doc.fillColor(pdfPalette.muted).font('Helvetica-Bold').fontSize(9).text(metric.row.label.toUpperCase(), tools.margin + innerPadding, cursorY, {
+      width: innerWidth,
+    });
+    doc.fillColor(pdfPalette.text).font('Helvetica').fontSize(11).text(metric.row.value, tools.margin + innerPadding, cursorY + metric.labelHeight + 2, {
+      width: innerWidth,
+    });
+    cursorY += metric.totalHeight;
+    if (index < rowMetrics.length - 1) {
+      doc
+        .strokeColor('#e5efe8')
+        .lineWidth(1)
+        .moveTo(tools.margin + innerPadding, cursorY + 3)
+        .lineTo(tools.margin + tools.contentWidth - innerPadding, cursorY + 3)
+        .stroke();
+      cursorY += 6;
+    }
+  });
+
+  tools.setY(y + cardHeight + 12);
+}
+
+function drawSectionHeading(doc: PDFKit.PDFDocument, tools: PdfRenderTools, title: string): void {
+  tools.ensureSpace(24);
+  const y = tools.getY();
+  doc.fillColor(pdfPalette.text).font('Helvetica-Bold').fontSize(13).text(title, tools.margin, y, { width: tools.contentWidth });
+  tools.setY(doc.y + 6);
+}
+
+function drawProductLinesTable(doc: PDFKit.PDFDocument, tools: PdfRenderTools, lines: OutboundProductLine[]): void {
+  const columns = [
+    { key: 'item', label: 'Item', width: 0.33 },
+    { key: 'sku', label: 'SKU', width: 0.19 },
+    { key: 'qty', label: 'Qtd', width: 0.12 },
+    { key: 'unitPrice', label: 'Preco', width: 0.18 },
+    { key: 'lineCost', label: 'Custo', width: 0.18 },
+  ] as const;
+  const columnWidths = columns.map((column) => Math.floor(tools.contentWidth * column.width));
+  const widthDiff = tools.contentWidth - columnWidths.reduce((acc, width) => acc + width, 0);
+  columnWidths[columnWidths.length - 1] += widthDiff;
+
+  const drawHeader = (isContinuation = false) => {
+    if (isContinuation) {
+      drawSectionHeading(doc, tools, 'Itens da operacao (contin.)');
+    }
+    tools.ensureSpace(28);
+    const y = tools.getY();
+    doc.rect(tools.margin, y, tools.contentWidth, 26).fillAndStroke(pdfPalette.tableHeaderBackground, pdfPalette.tableHeaderBorder);
+
+    let cursorX = tools.margin;
+    columns.forEach((column, index) => {
+      const columnWidth = columnWidths[index];
+      doc
+        .fillColor(pdfPalette.primary)
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(column.label, cursorX + 8, y + 8, {
+          width: columnWidth - 16,
+          ellipsis: true,
+        });
+      cursorX += columnWidth;
+    });
+    tools.setY(y + 26);
+  };
+
+  drawSectionHeading(doc, tools, 'Itens da operacao');
+  drawHeader();
+
+  lines.forEach((line, index) => {
+    const rowValues = [
+      line.itemName,
+      line.itemSku,
+      `${formatDecimalValue(line.itemQty)} ${line.itemUnit}`,
+      formatDecimalValue(line.itemUnitPriceSnapshot),
+      formatDecimalValue(line.lineCost),
+    ];
+    const rowHeights = rowValues.map((value, columnIndex) => {
+      doc.font('Helvetica').fontSize(10);
+      return doc.heightOfString(value, {
+        width: columnWidths[columnIndex] - 16,
+      });
+    });
+    const rowHeight = Math.max(28, Math.max(...rowHeights) + 12);
+    const pageChanged = tools.ensureSpace(rowHeight + 2);
+    if (pageChanged) {
+      drawHeader(true);
+    }
+
+    const y = tools.getY();
+    const fillColor = index % 2 === 0 ? '#ffffff' : pdfPalette.tableRowAlt;
+    doc.rect(tools.margin, y, tools.contentWidth, rowHeight).fillAndStroke(fillColor, pdfPalette.tableRowBorder);
+
+    let cursorX = tools.margin;
+    rowValues.forEach((value, columnIndex) => {
+      doc
+        .fillColor(pdfPalette.text)
+        .font('Helvetica')
+        .fontSize(10)
+        .text(value, cursorX + 8, y + 6, {
+          width: columnWidths[columnIndex] - 16,
+          ellipsis: true,
+        });
+      cursorX += columnWidths[columnIndex];
+    });
+
+    tools.setY(y + rowHeight);
   });
 }
 
@@ -223,45 +412,21 @@ export class OutboundOperationEmailService {
     const generatedAt = formatPtBrDateTime(payload.createdAt);
     const noteText = trimOrNull(payload.note) ?? '-';
 
-    return renderPdf((doc, addPageIfNeeded) => {
-      const margin = 40;
-      const contentWidth = doc.page.width - margin * 2;
+    return renderPdf((doc, tools) => {
+      drawPdfHeader(doc, tools, generatedAt);
 
-      doc.font('Helvetica-Bold').fontSize(18).text('Saida de operacao - Soil Tecnologia', margin);
-      doc.moveDown(0.5);
+      drawInfoCard(doc, tools, 'Dados da operacao', [
+        { label: 'Referencia', value: payload.referenceId },
+        { label: 'Escopo', value: payload.scopeLabel },
+        { label: 'Produto', value: `${payload.productName} (${payload.productSku})` },
+        { label: 'Quantidade', value: formatDecimalValue(payload.productQty) },
+        { label: 'Custo total', value: formatDecimalValue(payload.totalCost) },
+        { label: 'Custo unitario', value: formatDecimalValue(payload.unitCost) },
+        { label: 'Usuario', value: `${userDisplayName(payload.actorName, payload.actorEmail)} (${payload.actorEmail})` },
+        { label: 'Nota', value: noteText },
+      ]);
 
-      addPageIfNeeded(48);
-      doc.roundedRect(margin, doc.y, contentWidth, 40, 6).fillAndStroke('#E9F8ED', '#B7DFC1');
-      doc.fillColor('#166534').font('Helvetica-Bold').fontSize(9).text('GERADO EM', margin + 10, doc.y - 36);
-      doc
-        .fillColor('#111827')
-        .font('Helvetica-Bold')
-        .fontSize(12)
-        .text(generatedAt, margin + 10, doc.y - 22);
-      doc.fillColor('#111827');
-      doc.moveDown(1.5);
-
-      doc.font('Helvetica').fontSize(11);
-      doc.text(`Referencia: ${payload.referenceId}`);
-      doc.text(`Escopo: ${payload.scopeLabel}`);
-      doc.text(`Produto: ${payload.productName} (${payload.productSku})`);
-      doc.text(`Quantidade: ${formatDecimalValue(payload.productQty)}`);
-      doc.text(`Custo total: ${formatDecimalValue(payload.totalCost)}`);
-      doc.text(`Custo unitario: ${formatDecimalValue(payload.unitCost)}`);
-      doc.text(`Usuario: ${userDisplayName(payload.actorName, payload.actorEmail)} (${payload.actorEmail})`);
-      doc.text(`Nota: ${noteText}`);
-      doc.moveDown(1);
-
-      doc.font('Helvetica-Bold').fontSize(13).text('Preview da operacao confirmada');
-      doc.moveDown(0.4);
-
-      doc.font('Helvetica').fontSize(10);
-      payload.lines.forEach((line, index) => {
-        addPageIfNeeded(44);
-        doc.text(
-          `${index + 1}. ${line.itemName} (${line.itemSku}) | qtd ${formatDecimalValue(line.itemQty)} ${line.itemUnit} | preco ${formatDecimalValue(line.itemUnitPriceSnapshot)} | custo ${formatDecimalValue(line.lineCost)}`,
-        );
-      });
+      drawProductLinesTable(doc, tools, payload.lines);
     });
   }
 
@@ -269,35 +434,21 @@ export class OutboundOperationEmailService {
     const generatedAt = formatPtBrDateTime(payload.createdAt);
     const noteText = trimOrNull(payload.note) ?? '-';
 
-    return renderPdf((doc, addPageIfNeeded) => {
-      const margin = 40;
-      const contentWidth = doc.page.width - margin * 2;
+    return renderPdf((doc, tools) => {
+      drawPdfHeader(doc, tools, generatedAt);
 
-      doc.font('Helvetica-Bold').fontSize(18).text('Saida de operacao - Soil Tecnologia', margin);
-      doc.moveDown(0.5);
-
-      addPageIfNeeded(48);
-      doc.roundedRect(margin, doc.y, contentWidth, 40, 6).fillAndStroke('#E9F8ED', '#B7DFC1');
-      doc.fillColor('#166534').font('Helvetica-Bold').fontSize(9).text('GERADO EM', margin + 10, doc.y - 36);
-      doc
-        .fillColor('#111827')
-        .font('Helvetica-Bold')
-        .fontSize(12)
-        .text(generatedAt, margin + 10, doc.y - 22);
-      doc.fillColor('#111827');
-      doc.moveDown(1.5);
-
-      doc.font('Helvetica').fontSize(11);
-      doc.text(`Referencia: ${payload.referenceId}`);
-      doc.text(`Escopo: Item`);
-      doc.text(`Item: ${payload.itemName} (${payload.itemSku})`);
-      doc.text(`Quantidade: ${formatDecimalValue(payload.itemQty)} ${payload.itemUnit}`);
-      doc.text(`Preco unitario: ${formatDecimalValue(payload.itemUnitPrice)}`);
-      doc.text(`Custo estimado: ${formatDecimalValue(payload.estimatedCost)}`);
-      doc.text(`Estoque antes: ${formatDecimalValue(payload.previousQtyOnHand)} ${payload.itemUnit}`);
-      doc.text(`Estoque depois: ${formatDecimalValue(payload.nextQtyOnHand)} ${payload.itemUnit}`);
-      doc.text(`Usuario: ${userDisplayName(payload.actorName, payload.actorEmail)} (${payload.actorEmail})`);
-      doc.text(`Nota: ${noteText}`);
+      drawInfoCard(doc, tools, 'Dados da operacao', [
+        { label: 'Referencia', value: payload.referenceId },
+        { label: 'Escopo', value: 'Item' },
+        { label: 'Item', value: `${payload.itemName} (${payload.itemSku})` },
+        { label: 'Quantidade', value: `${formatDecimalValue(payload.itemQty)} ${payload.itemUnit}` },
+        { label: 'Preco unitario', value: formatDecimalValue(payload.itemUnitPrice) },
+        { label: 'Custo estimado', value: formatDecimalValue(payload.estimatedCost) },
+        { label: 'Estoque antes', value: `${formatDecimalValue(payload.previousQtyOnHand)} ${payload.itemUnit}` },
+        { label: 'Estoque depois', value: `${formatDecimalValue(payload.nextQtyOnHand)} ${payload.itemUnit}` },
+        { label: 'Usuario', value: `${userDisplayName(payload.actorName, payload.actorEmail)} (${payload.actorEmail})` },
+        { label: 'Nota', value: noteText },
+      ]);
     });
   }
 
