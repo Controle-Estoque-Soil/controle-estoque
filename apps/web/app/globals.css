@@ -421,6 +421,35 @@ a {
   vertical-align: top;
 }
 
+.min-cell-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.min-inline-badge {
+  font-size: 0.67rem;
+  padding: 0.1rem 0.42rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.item-actions-cell {
+  min-width: 170px;
+}
+
+.item-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: nowrap;
+}
+
+.item-row-actions .button {
+  white-space: nowrap;
+}
+
 .table tbody tr.table-row-selected {
   background: rgba(34, 197, 94, 0.08);
 }

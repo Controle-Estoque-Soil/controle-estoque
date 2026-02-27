@@ -606,12 +606,10 @@ export default function ItemsPage() {
                         <td>{formatDecimal(item.qtyOnHand)}</td>
                         <td>{item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-'}</td>
                         <td>
-                          {item.minQty ? formatDecimal(item.minQty) : '-'}
-                          {belowMin ? (
-                            <div style={{ marginTop: '0.35rem' }}>
-                              <span className="badge danger">Abaixo min.</span>
-                            </div>
-                          ) : null}
+                          <span className="min-cell-inline">
+                            <span>{item.minQty ? formatDecimal(item.minQty) : '-'}</span>
+                            {belowMin ? <span className="badge danger min-inline-badge">Abaixo min.</span> : null}
+                          </span>
                         </td>
                         <td>
                           <button type="button" className="button ghost compact" onClick={() => openPurchaseSourcesDialog(item)}>
@@ -623,8 +621,8 @@ export default function ItemsPage() {
                             Movimentacoes
                           </button>
                         </td>
-                        <td>
-                          <div className="actions">
+                        <td className="item-actions-cell">
+                          <div className="actions item-row-actions">
                             <button type="button" className="button ghost" onClick={() => void openDetailDialog(item.id)}>
                               Detalhe
                             </button>
