@@ -88,6 +88,10 @@ function isStandaloneItemMovement(movement: MovementRecord): boolean {
     return false;
   }
 
+  if (movement.note?.startsWith('[PRODUTO_ESTOQUE]')) {
+    return false;
+  }
+
   if (movement.note?.startsWith('[ITEM_DIRETO_')) {
     return true;
   }
@@ -113,7 +117,10 @@ function parseMovementNote(note: string | null): ParsedMovementNote {
     return { displayNote: null, sourceText: null };
   }
 
-  const raw = note.trim().replace(/^\[ITEM_DIRETO_[A-Z_]+\]\s*/i, '').trim();
+  const raw = note
+    .trim()
+    .replace(/^\[(ITEM_DIRETO_[A-Z_]+|PRODUTO_ESTOQUE)\]\s*/i, '')
+    .trim();
   if (!raw) {
     return { displayNote: null, sourceText: null };
   }
@@ -469,9 +476,6 @@ export default function MovementsPage() {
                         <td>{formatUserDisplayName(movement.createdByUser)}</td>
                         <td>
                           {parsedNote.displayNote ?? '-'}
-                          {isStandaloneItemMovement(movement) && parsedNote.displayNote ? (
-                            <div className="small" style={{ color: '#166534' }}>Saida/entrada de item fora de produto</div>
-                          ) : null}
                         </td>
                         <td>
                           {parsedNote.sourceText ? (
