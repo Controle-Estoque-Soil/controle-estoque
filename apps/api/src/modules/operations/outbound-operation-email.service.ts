@@ -51,11 +51,26 @@ function trimOrNull(value: string | null | undefined): string | null {
 
 function formatPtBrDateTime(isoDate: string): string {
   const date = new Date(isoDate);
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'medium',
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
     timeZone: 'America/Sao_Paulo',
-  }).format(date);
+  }).formatToParts(date);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '';
+  const day = get('day');
+  const month = get('month');
+  const year = get('year');
+  const hour = get('hour');
+  const minute = get('minute');
+  const second = get('second');
+
+  return `${day}/${month}/${year} às ${hour}:${minute}:${second} - BRT`;
 }
 
 function userDisplayName(name: string | null, email: string): string {
@@ -179,7 +194,7 @@ function drawPdfHeader(doc: PDFKit.PDFDocument, tools: PdfRenderTools, generated
   });
 
   doc.roundedRect(dateX, y + 12, dateBoxWidth, 64, 8).fillAndStroke('#ffffff', '#cfe8d8');
-  doc.fillColor(pdfPalette.primary).font('Helvetica-Bold').fontSize(9).text('GERADO EM', dateX + 12, y + 24, { width: dateBoxWidth - 24 });
+  doc.fillColor(pdfPalette.primary).font('Helvetica-Bold').fontSize(9).text('Gerado em', dateX + 12, y + 24, { width: dateBoxWidth - 24 });
   doc.fillColor(pdfPalette.text).font('Helvetica-Bold').fontSize(13).text(generatedAt, dateX + 12, y + 40, { width: dateBoxWidth - 24 });
 
   tools.setY(y + headerHeight + 14);
