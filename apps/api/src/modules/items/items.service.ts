@@ -268,6 +268,7 @@ export class ItemsService {
   }
 
   async update(id: string, input: ItemUpdateBody, actor: JwtUserPayload): Promise<ItemResponse> {
+    void actor;
     const nextQtyOnHand = input.qtyOnHand === undefined ? undefined : toDecimal(input.qtyOnHand);
 
     if (nextQtyOnHand?.isNegative()) {
@@ -305,23 +306,6 @@ export class ItemsService {
         tx,
       );
 
-      if (nextQtyOnHand !== undefined) {
-        const deltaQty = nextQtyOnHand.sub(existing.qtyOnHand);
-        if (!deltaQty.isZero()) {
-          await this.itemsRepository.createMovement(
-            {
-              itemId: id,
-              deltaQty,
-              reason: 'MANUAL_ADJUSTMENT',
-              referenceType: 'MANUAL_ADJUSTMENT',
-              note: 'Ajuste de estoque pela edicao do item',
-              createdByUserId: actor.sub,
-            },
-            tx,
-          );
-        }
-      }
-
       return updated;
     });
 
@@ -334,15 +318,76 @@ export class ItemsService {
       throw appErrors.notFound('Item not found');
     }
 
-    try {
-      const item = await this.itemsRepository.delete(id);
-      return serializeItem(item);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-        throw appErrors.conflict('Item nao pode ser removido porque possui movimentacoes/BOM/ordens vinculadas');
+    const item = await this.itemsRepository.transaction(async (tx) => {
+      await tx.productBomItem.deleteMany({
+        where: { itemId: id },
+      });
+
+      const movementIds = (
+        await tx.stockMovement.findMany({
+          where: { itemId: id },
+          select: { id: true },
+        })
+      ).map((movement) => movement.id);
+
+      if (movementIds.length > 0) {
+        await tx.stockMovement.deleteMany({
+          where: { reversalOfMovementId: { in: movementIds } },
+        });
+
+        await tx.stockMovement.deleteMany({
+          where: { id: { in: movementIds } },
+        });
       }
-      throw error;
-    }
+
+      const affectedOrderIds = Array.from(
+        new Set(
+          (
+            await tx.productOrderLine.findMany({
+              where: { itemId: id },
+              select: { orderId: true },
+            })
+          ).map((line) => line.orderId),
+        ),
+      );
+
+      if (affectedOrderIds.length > 0) {
+        await tx.productOrderLine.deleteMany({
+          where: { itemId: id },
+        });
+
+        const remainingLinesPerOrder = await tx.productOrderLine.groupBy({
+          by: ['orderId'],
+          where: { orderId: { in: affectedOrderIds } },
+          _count: { _all: true },
+        });
+        const ordersWithRemainingLines = new Set(remainingLinesPerOrder.map((row) => row.orderId));
+        const orphanOrderIds = affectedOrderIds.filter((orderId) => !ordersWithRemainingLines.has(orderId));
+
+        if (orphanOrderIds.length > 0) {
+          await tx.productOrder.deleteMany({
+            where: {
+              id: { in: orphanOrderIds },
+              reversalOfOrderId: { not: null },
+            },
+          });
+          await tx.productOrder.deleteMany({
+            where: { id: { in: orphanOrderIds } },
+          });
+        }
+      }
+
+      return tx.item.delete({
+        where: { id },
+        include: {
+          purchaseSources: {
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+          },
+        },
+      });
+    });
+
+    return serializeItem(item);
   }
 
   async adjustStock(id: string, input: StockAdjustmentBody, actor: JwtUserPayload): Promise<StockAdjustmentResult> {
