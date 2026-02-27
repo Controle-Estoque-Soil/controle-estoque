@@ -57,6 +57,20 @@ Depois rode:
 
 - `docker compose --env-file deploy/aws-ec2/.env.prod -f deploy/aws-ec2/docker-compose.prod.yml run --rm inventory-api npm run prisma:seed`
 
+## Email automatico (saida confirmada)
+
+Para enviar PDF por email em cada operacao de saida confirmada (produto, produto intermediario e item direto da tela Operacoes), configure no `.env.prod`:
+
+- `INVENTORY_OUTBOUND_OPERATION_EMAIL_ENABLED=true`
+- `INVENTORY_OUTBOUND_OPERATION_EMAIL_TO=jose.queiroz@soiltech.com.br`
+- `INVENTORY_OUTBOUND_OPERATION_EMAIL_SUBJECT=Saida de Produto Soil Tecnologia`
+- `INVENTORY_SMTP_HOST`
+- `INVENTORY_SMTP_PORT`
+- `INVENTORY_SMTP_SECURE`
+- `INVENTORY_SMTP_USER`
+- `INVENTORY_SMTP_PASS`
+- `INVENTORY_SMTP_FROM`
+
 ## Backup / restore (Postgres)
 
 Backup:

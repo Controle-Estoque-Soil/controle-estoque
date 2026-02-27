@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import { parseWithSchema } from '../../utils/validation';
+import { OutboundOperationEmailService } from '../operations/outbound-operation-email.service';
 import { ItemsRepository } from './items.repository';
 import { ItemsService } from './items.service';
 import {
@@ -13,6 +14,7 @@ import {
 
 export const itemsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
+  const outboundEmailService = new OutboundOperationEmailService(fastify.config, fastify.log);
 
   fastify.get('/items', async (request) => {
     const query = parseWithSchema(itemListQuerySchema, request.query);
@@ -64,8 +66,12 @@ export const itemsRoutes: FastifyPluginAsync = async (fastify) => {
     const params = parseWithSchema(itemIdParamsSchema, request.params);
     const body = parseWithSchema(stockAdjustmentBodySchema, request.body);
     const service = new ItemsService(new ItemsRepository(fastify.prisma));
+    const result = await service.adjustStock(params.id, body, request.user);
+    if (result.directOutboundEmailPayload) {
+      await outboundEmailService.sendItemOutbound(result.directOutboundEmailPayload);
+    }
     return {
-      data: await service.adjustStock(params.id, body, request.user),
+      data: result.item,
     };
   });
 };

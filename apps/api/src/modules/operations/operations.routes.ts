@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastif
 
 import { parseWithSchema } from '../../utils/validation';
 import { OperationsRepository } from './operations.repository';
+import { OutboundOperationEmailService } from './outbound-operation-email.service';
 import { OperationsService } from './operations.service';
 import {
   movementListQuerySchema,
@@ -23,6 +24,7 @@ function assertOverridePermission(
 
 export const operationsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
+  const outboundEmailService = new OutboundOperationEmailService(fastify.config, fastify.log);
 
   fastify.post('/operations/outbound/preview', async (request) => {
     const body = parseWithSchema(operationExecuteBodySchema, request.body);
@@ -43,6 +45,27 @@ export const operationsRoutes: FastifyPluginAsync = async (fastify) => {
     assertOverridePermission(fastify, request, body.allowNegativeOverride ?? false);
     const service = new OperationsService(new OperationsRepository(fastify.prisma));
     const operation = await service.execute('OUTBOUND_PRODUCT', body, request.user);
+    await outboundEmailService.sendProductOutbound({
+      referenceId: operation.id,
+      scopeLabel: operation.product.kind === 'INTERMEDIATE' ? 'Produto intermediario' : 'Produto',
+      productName: operation.product.name,
+      productSku: operation.product.sku,
+      productQty: operation.productQty,
+      totalCost: operation.totalCost,
+      unitCost: operation.unitCost,
+      note: operation.note,
+      createdAt: operation.createdAt,
+      actorName: operation.createdByUser.name ?? null,
+      actorEmail: operation.createdByUser.email,
+      lines: operation.lines.map((line) => ({
+        itemName: line.item.name,
+        itemSku: line.item.sku,
+        itemUnit: line.item.unit,
+        itemQty: line.itemQty,
+        itemUnitPriceSnapshot: line.itemUnitPriceSnapshot,
+        lineCost: line.lineCost,
+      })),
+    });
     return reply.status(201).send({ data: operation });
   });
 

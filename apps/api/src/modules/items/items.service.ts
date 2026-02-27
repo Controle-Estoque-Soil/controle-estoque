@@ -45,6 +45,27 @@ export interface ItemMovementResponse {
   };
 }
 
+export interface DirectOutboundItemEmailPayload {
+  referenceId: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+  itemQty: string;
+  itemUnitPrice: string;
+  estimatedCost: string;
+  previousQtyOnHand: string;
+  nextQtyOnHand: string;
+  note: string | null;
+  createdAt: string;
+  actorName: string | null;
+  actorEmail: string;
+}
+
+export interface StockAdjustmentResult {
+  item: ItemResponse;
+  directOutboundEmailPayload: DirectOutboundItemEmailPayload | null;
+}
+
 function normalizeSku(sku?: string | null): string | undefined {
   const normalized = sku?.trim().toUpperCase();
   return normalized ? normalized : undefined;
@@ -60,6 +81,20 @@ function resolveItemSkuForUpdate(sku?: string | null): string | undefined {
 
 function generateAutoSku(prefix: 'ITM'): string {
   return `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+}
+
+function extractDirectOutboundNote(note: string | null | undefined): string | null {
+  if (!note) {
+    return null;
+  }
+
+  const directOutboundPrefix = /^\[ITEM_DIRETO_OUTBOUND\]\s*/i;
+  if (!directOutboundPrefix.test(note)) {
+    return null;
+  }
+
+  const cleaned = note.replace(directOutboundPrefix, '').trim();
+  return cleaned || null;
 }
 
 function normalizePurchaseSourceInput(
@@ -310,7 +345,7 @@ export class ItemsService {
     }
   }
 
-  async adjustStock(id: string, input: StockAdjustmentBody, actor: JwtUserPayload): Promise<ItemResponse> {
+  async adjustStock(id: string, input: StockAdjustmentBody, actor: JwtUserPayload): Promise<StockAdjustmentResult> {
     const deltaQty = toDecimal(input.deltaQty);
 
     if (deltaQty.isZero()) {
@@ -321,7 +356,7 @@ export class ItemsService {
       throw appErrors.forbidden('Somente ADMIN pode usar override de estoque negativo');
     }
 
-    const item = await this.itemsRepository.transaction(async (tx) => {
+    const result = await this.itemsRepository.transaction(async (tx) => {
       const existing = await tx.item.findUnique({ where: { id } });
       if (!existing) {
         throw appErrors.notFound('Item not found');
@@ -337,7 +372,7 @@ export class ItemsService {
         data: { qtyOnHand: nextQty },
       });
 
-      await this.itemsRepository.createMovement(
+      const movement = await this.itemsRepository.createMovement(
         {
           itemId: id,
           deltaQty,
@@ -349,9 +384,35 @@ export class ItemsService {
         tx,
       );
 
-      return updated;
+      const directOutboundNote = extractDirectOutboundNote(input.note ?? null);
+      const directOutboundEmailPayload =
+        deltaQty.isNegative() && directOutboundNote !== null
+          ? {
+              referenceId: movement.referenceId ?? movement.id,
+              itemName: updated.name,
+              itemSku: updated.sku,
+              itemUnit: updated.unit,
+              itemQty: decimalToString(deltaQty.abs()) ?? '0',
+              itemUnitPrice: decimalToString(updated.unitPrice) ?? '0',
+              estimatedCost: decimalToString(deltaQty.abs().mul(updated.unitPrice)) ?? '0',
+              previousQtyOnHand: decimalToString(existing.qtyOnHand) ?? '0',
+              nextQtyOnHand: decimalToString(updated.qtyOnHand) ?? '0',
+              note: directOutboundNote,
+              createdAt: movement.createdAt.toISOString(),
+              actorName: movement.createdByUser.name ?? null,
+              actorEmail: movement.createdByUser.email,
+            }
+          : null;
+
+      return {
+        item: updated,
+        directOutboundEmailPayload,
+      };
     });
 
-    return serializeItem(item);
+    return {
+      item: serializeItem(result.item),
+      directOutboundEmailPayload: result.directOutboundEmailPayload,
+    };
   }
 }
