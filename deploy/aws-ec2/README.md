@@ -64,12 +64,12 @@ Para enviar PDF por email em cada operacao de saida confirmada (produto, produto
 - `INVENTORY_OUTBOUND_OPERATION_EMAIL_ENABLED=true`
 - `INVENTORY_OUTBOUND_OPERATION_EMAIL_TO=jose.queiroz@soiltech.com.br`
 - `INVENTORY_OUTBOUND_OPERATION_EMAIL_SUBJECT=Saida de Produto Soil Tecnologia`
-- `INVENTORY_SMTP_HOST`
-- `INVENTORY_SMTP_PORT`
-- `INVENTORY_SMTP_SECURE`
 - `INVENTORY_SMTP_USER`
 - `INVENTORY_SMTP_PASS`
-- `INVENTORY_SMTP_FROM`
+- `INVENTORY_SMTP_HOST=smtp.gmail.com` (opcional, default)
+- `INVENTORY_SMTP_PORT=587` (opcional, default)
+- `INVENTORY_SMTP_SECURE=false` (opcional, default)
+- `INVENTORY_SMTP_FROM=<mesmo email do INVENTORY_SMTP_USER>` (opcional)
 
 ## Backup / restore (Postgres)
 

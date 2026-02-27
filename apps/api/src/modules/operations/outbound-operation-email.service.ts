@@ -168,16 +168,12 @@ export class OutboundOperationEmailService {
       return null;
     }
 
-    const smtpHost = trimOrNull(this.config.SMTP_HOST);
-    const smtpFrom = trimOrNull(this.config.SMTP_FROM) ?? trimOrNull(this.config.SMTP_USER);
-    if (!smtpHost) {
+    const smtpHost = trimOrNull(this.config.SMTP_HOST) ?? 'smtp.gmail.com';
+    const smtpUser = trimOrNull(this.config.SMTP_USER);
+    const smtpPass = trimOrNull(this.config.SMTP_PASS);
+    if (!smtpUser || !smtpPass) {
       this.transporterState = 'unavailable';
-      this.logUnavailable('SMTP_HOST is not configured');
-      return null;
-    }
-    if (!smtpFrom) {
-      this.transporterState = 'unavailable';
-      this.logUnavailable('SMTP_FROM or SMTP_USER is required');
+      this.logUnavailable('SMTP_USER and SMTP_PASS are required');
       return null;
     }
 
@@ -185,13 +181,10 @@ export class OutboundOperationEmailService {
       host: smtpHost,
       port: this.config.SMTP_PORT,
       secure: this.config.SMTP_SECURE,
-      auth:
-        this.config.SMTP_USER && this.config.SMTP_PASS
-          ? {
-              user: this.config.SMTP_USER,
-              pass: this.config.SMTP_PASS,
-            }
-          : undefined,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
     });
     this.transporterState = 'ready';
     return this.transporter;

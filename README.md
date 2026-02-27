@@ -67,7 +67,8 @@ Principais variaveis locais:
 - `OUTBOUND_OPERATION_EMAIL_ENABLED`
 - `OUTBOUND_OPERATION_EMAIL_TO`
 - `OUTBOUND_OPERATION_EMAIL_SUBJECT`
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- `SMTP_USER`, `SMTP_PASS` (necessarios para envio de email)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_FROM` (opcionais, com default Gmail)
 - `NEXT_PUBLIC_API_URL`
 
 ### 2) API (`apps/api/.env`) - rodando fora do Docker
@@ -90,7 +91,8 @@ Opcionais:
 - `OUTBOUND_OPERATION_EMAIL_ENABLED`
 - `OUTBOUND_OPERATION_EMAIL_TO`
 - `OUTBOUND_OPERATION_EMAIL_SUBJECT`
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- `SMTP_USER`, `SMTP_PASS` (necessarios para envio de email)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_FROM` (opcionais, com default Gmail)
 
 ### 3) Web (`apps/web/.env.local`) - Next.js
 
@@ -114,8 +116,8 @@ Principais variaveis:
 - `INVENTORY_OUTBOUND_OPERATION_EMAIL_ENABLED`
 - `INVENTORY_OUTBOUND_OPERATION_EMAIL_TO`
 - `INVENTORY_OUTBOUND_OPERATION_EMAIL_SUBJECT`
-- `INVENTORY_SMTP_HOST`, `INVENTORY_SMTP_PORT`, `INVENTORY_SMTP_SECURE`
-- `INVENTORY_SMTP_USER`, `INVENTORY_SMTP_PASS`, `INVENTORY_SMTP_FROM`
+- `INVENTORY_SMTP_USER`, `INVENTORY_SMTP_PASS` (necessarios para envio de email)
+- `INVENTORY_SMTP_HOST`, `INVENTORY_SMTP_PORT`, `INVENTORY_SMTP_SECURE`, `INVENTORY_SMTP_FROM` (opcionais, com default Gmail)
 
 ## Rodando localmente (sem Docker)
 
@@ -347,6 +349,8 @@ Restore (cuidado):
 
 ## GitHub Secrets (deploy EC2)
 
+O workflow `deploy-ec2.yml` ja fixa os defaults de email (Gmail + destinatario + assunto). Para email automatico de saida, voce precisa informar somente `PROD_SMTP_USER` e `PROD_SMTP_PASS`.
+
 Minimo recomendado para `deploy-ec2.yml`:
 
 - `AWS_EC2_HOST`
@@ -360,10 +364,8 @@ Minimo recomendado para `deploy-ec2.yml`:
 - `PROD_POSTGRES_PASSWORD`
 - `PROD_DOMAIN_API`
 - `PROD_TLS_EMAIL`
-- `PROD_SMTP_HOST`
 - `PROD_SMTP_USER`
 - `PROD_SMTP_PASS`
-- `PROD_SMTP_FROM`
 
 Tambem recomendados:
 
@@ -376,11 +378,6 @@ Tambem recomendados:
 - `PROD_LOG_LEVEL`
 - `PROD_BCRYPT_SALT_ROUNDS`
 - `PROD_ENABLE_SECURITY_HEADERS`
-- `PROD_SMTP_PORT`
-- `PROD_SMTP_SECURE`
-- `PROD_OUTBOUND_OPERATION_EMAIL_ENABLED`
-- `PROD_OUTBOUND_OPERATION_EMAIL_TO`
-- `PROD_OUTBOUND_OPERATION_EMAIL_SUBJECT`
 
 ## Rollback (simples e reversivel)
 

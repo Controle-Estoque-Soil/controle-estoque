@@ -15,7 +15,7 @@ const envSchema = z.object({
   OUTBOUND_OPERATION_EMAIL_ENABLED: z.coerce.boolean().default(true),
   OUTBOUND_OPERATION_EMAIL_TO: z.string().email().default('jose.queiroz@soiltech.com.br'),
   OUTBOUND_OPERATION_EMAIL_SUBJECT: z.string().min(1).default('Saida de Produto Soil Tecnologia'),
-  SMTP_HOST: z.string().optional(),
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_SECURE: z.coerce.boolean().default(false),
   SMTP_USER: z.string().optional(),
