@@ -424,6 +424,11 @@ a {
   background: rgba(239, 68, 68, 0.08);
 }
 
+.table tbody tr.table-row-below-min {
+  background: rgba(239, 68, 68, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.3);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

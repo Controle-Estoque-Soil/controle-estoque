@@ -594,7 +594,7 @@ export default function ItemsPage() {
                   items.map((item) => {
                     const belowMin = item.minQty && Number(item.qtyOnHand) < Number(item.minQty);
                     return (
-                      <tr key={item.id}>
+                      <tr key={item.id} className={belowMin ? 'table-row-below-min' : undefined}>
                         <td>{item.name}</td>
                         <td>{item.sku}</td>
                         <td>{item.unit}</td>

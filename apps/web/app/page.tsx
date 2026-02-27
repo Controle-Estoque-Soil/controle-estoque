@@ -381,17 +381,20 @@ export default function DashboardPage() {
                         <td colSpan={7}>Nenhum item cadastrado.</td>
                       </tr>
                     ) : (
-                      items.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.name}</td>
-                          <td>{item.sku}</td>
-                          <td>{item.unit}</td>
-                          <td>{formatDecimal(item.unitPrice)}</td>
-                          <td>{formatDecimal(item.qtyOnHand)}</td>
-                          <td>{item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-'}</td>
-                          <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
-                        </tr>
-                      ))
+                      items.map((item) => {
+                        const belowMinItem = item.minQty && Number(item.qtyOnHand) < Number(item.minQty);
+                        return (
+                          <tr key={item.id} className={belowMinItem ? 'table-row-below-min' : undefined}>
+                            <td>{item.name}</td>
+                            <td>{item.sku}</td>
+                            <td>{item.unit}</td>
+                            <td>{formatDecimal(item.unitPrice)}</td>
+                            <td>{formatDecimal(item.qtyOnHand)}</td>
+                            <td>{item.purchaseLeadTimeDays ? formatDecimal(item.purchaseLeadTimeDays) : '-'}</td>
+                            <td>{item.minQty ? formatDecimal(item.minQty) : '-'}</td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
