@@ -86,76 +86,77 @@ export function DeleteActionDialog({
           </button>
         </div>
 
-        <div className="segmented" role="tablist" aria-label="Tipo de exclusão">
-          <button
-            type="button"
-            className={mode === 'quantity' ? 'segmented-button active' : 'segmented-button'}
-            onClick={() => setMode('quantity')}
-            disabled={busy}
-          >
-            Quantidade
-          </button>
-          <button
-            type="button"
-            className={mode === 'all' ? 'segmented-button active' : 'segmented-button'}
-            onClick={() => setMode('all')}
-            disabled={busy}
-          >
-            Deletar tudo
-          </button>
-        </div>
+        <div className="modal-body-scroll">
+          <div className="segmented" role="tablist" aria-label="Tipo de exclusao">
+            <button
+              type="button"
+              className={mode === 'quantity' ? 'segmented-button active' : 'segmented-button'}
+              onClick={() => setMode('quantity')}
+              disabled={busy}
+            >
+              Quantidade
+            </button>
+            <button
+              type="button"
+              className={mode === 'all' ? 'segmented-button active' : 'segmented-button'}
+              onClick={() => setMode('all')}
+              disabled={busy}
+            >
+              Deletar tudo
+            </button>
+          </div>
 
-        {mode === 'quantity' ? (
-          <div className="grid">
-            <div className="field">
-              <label>{quantityLabel}</label>
-              <div className="stepper">
-                <button type="button" className="button ghost" onClick={() => adjustQuantity(-1)} disabled={busy}>
-                  -
-                </button>
-                <input
-                  className="input"
-                  inputMode="decimal"
-                  value={quantityValue}
-                  onChange={(e) => onQuantityChange(e.target.value.replace(',', '.'))}
-                  placeholder="1"
-                  aria-label={quantityLabel}
-                  disabled={busy}
-                />
-                <button type="button" className="button ghost" onClick={() => adjustQuantity(1)} disabled={busy}>
-                  +
-                </button>
-              </div>
-              <p className="small" style={{ margin: 0 }}>
-                {quantityUnit ? `Unidade: ${quantityUnit}` : 'Informe a quantidade para remover.'}
-              </p>
-            </div>
-            <div className="actions">
-              <button type="button" className="button secondary" onClick={() => void onConfirmQuantity()} disabled={busy}>
-                {busy ? 'Processando...' : 'Confirmar quantidade'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="grid">
-            {showTotal ? (
-              <div className="panel" style={{ padding: '0.75rem' }}>
-                <div className="small">{totalValueLabel ?? 'Total'}</div>
-                <div className="card-value" style={{ fontSize: '1.25rem' }}>
-                  {totalValue} {totalValueUnit ?? ''}
+          {mode === 'quantity' ? (
+            <div className="grid">
+              <div className="field">
+                <label>{quantityLabel}</label>
+                <div className="stepper">
+                  <button type="button" className="button ghost" onClick={() => adjustQuantity(-1)} disabled={busy}>
+                    -
+                  </button>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={quantityValue}
+                    onChange={(e) => onQuantityChange(e.target.value.replace(',', '.'))}
+                    placeholder="1"
+                    aria-label={quantityLabel}
+                    disabled={busy}
+                  />
+                  <button type="button" className="button ghost" onClick={() => adjustQuantity(1)} disabled={busy}>
+                    +
+                  </button>
                 </div>
+                <p className="small" style={{ margin: 0 }}>
+                  {quantityUnit ? `Unidade: ${quantityUnit}` : 'Informe a quantidade para remover.'}
+                </p>
               </div>
-            ) : null}
-            {allModeDescription ? <p className="small">{allModeDescription}</p> : null}
-            <div className="actions">
-              <button type="button" className="button danger" onClick={() => void onConfirmDeleteAll()} disabled={busy}>
-                {busy ? 'Processando...' : 'Deletar tudo'}
-              </button>
+              <div className="actions">
+                <button type="button" className="button secondary" onClick={() => void onConfirmQuantity()} disabled={busy}>
+                  {busy ? 'Processando...' : 'Confirmar quantidade'}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="grid">
+              {showTotal ? (
+                <div className="panel" style={{ padding: '0.75rem' }}>
+                  <div className="small">{totalValueLabel ?? 'Total'}</div>
+                  <div className="card-value" style={{ fontSize: '1.25rem' }}>
+                    {totalValue} {totalValueUnit ?? ''}
+                  </div>
+                </div>
+              ) : null}
+              {allModeDescription ? <p className="small">{allModeDescription}</p> : null}
+              <div className="actions">
+                <button type="button" className="button danger" onClick={() => void onConfirmDeleteAll()} disabled={busy}>
+                  {busy ? 'Processando...' : 'Deletar tudo'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
-

@@ -622,6 +622,10 @@ a {
   overscroll-behavior: contain;
 }
 
+body:has(.modal-overlay) {
+  overflow: hidden;
+}
+
 .modal-card {
   width: min(560px, 100%);
   max-height: calc(100vh - 2rem);
