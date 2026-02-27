@@ -2,10 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com';
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'admin12345';
-const ITEM_NAME = 'Farinha E2E';
-const ITEM_SKU = 'E2E-FAR-001';
-const PRODUCT_NAME = 'Pao E2E';
-const PRODUCT_SKU = 'E2E-PROD-001';
+const ITEM_NAME_BASE = 'Farinha E2E';
+const ITEM_SKU_BASE = 'E2E-FAR';
+const PRODUCT_NAME_BASE = 'Pao E2E';
+const PRODUCT_SKU_BASE = 'E2E-PROD';
+let createdItemName = ITEM_NAME_BASE;
 
 async function login(page: Page) {
   await page.goto('/');
@@ -17,26 +18,32 @@ async function login(page: Page) {
 }
 
 async function openNav(page: Page, href: string, readySelector: () => Promise<void>) {
-  const modalOverlays = page.locator('.modal-overlay');
-  if ((await modalOverlays.count()) > 0) {
-    const overlay = modalOverlays.last();
-    if (await overlay.isVisible().catch(() => false)) {
-      const closeButton = overlay.getByRole('button', { name: 'Fechar' });
-      if ((await closeButton.count()) > 0 && (await closeButton.first().isVisible().catch(() => false))) {
-        await closeButton.first().click();
-      } else {
-        await overlay.click({ position: { x: 8, y: 8 } });
-      }
-      await expect(overlay).toBeHidden({ timeout: 5000 });
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const modalOverlays = page.locator('.modal-overlay');
+    if ((await modalOverlays.count()) === 0) {
+      break;
     }
+    const overlay = modalOverlays.last();
+    if (!(await overlay.isVisible().catch(() => false))) {
+      break;
+    }
+
+    const closeButton = overlay.getByRole('button', { name: 'Fechar' });
+    if ((await closeButton.count()) > 0 && (await closeButton.first().isVisible().catch(() => false))) {
+      await closeButton.first().click();
+    } else {
+      await overlay.click({ position: { x: 8, y: 8 } });
+    }
+
+    await expect(overlay).toBeHidden({ timeout: 5000 });
   }
 
   await page.locator(`a[href="${href}"]`).click();
   await readySelector();
 }
 
-async function expectItemStock(page: Page, expected: RegExp) {
-  const row = page.locator('tr', { hasText: ITEM_NAME }).first();
+async function expectItemStock(page: Page, itemName: string, expected: RegExp) {
+  const row = page.locator('tr', { hasText: itemName }).first();
   await expect(row).toBeVisible();
   const stockCell = row.locator('td').nth(4);
   await expect(stockCell).toContainText(expected);
@@ -50,49 +57,56 @@ test.describe.serial('stock platform e2e', () => {
     await expect(page.locator('.topbar-title')).toHaveText(ADMIN_EMAIL);
   });
 
-  test('flow 1: create item/product/BOM and outbound qty=2 updates stock and cost', async ({ page }) => {
+  test('flow 1: create item/product/BOM and outbound qty=2 updates stock and cost', async ({ page }, testInfo) => {
+    const suffix = `${Date.now()}-${testInfo.retry}`;
+    const itemName = `${ITEM_NAME_BASE} ${suffix}`;
+    const itemSku = `${ITEM_SKU_BASE}-${suffix}`.toUpperCase();
+    const productName = `${PRODUCT_NAME_BASE} ${suffix}`;
+    const productSku = `${PRODUCT_SKU_BASE}-${suffix}`.toUpperCase();
+    createdItemName = itemName;
+
     await login(page);
 
     await openNav(page, '/items', async () => {
-      await expect(page.getByRole('heading', { name: 'Itens / Materia-prima' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Itens\s*\/\s*Mat/i })).toBeVisible();
     });
     await page.getByRole('button', { name: 'Criar item' }).click();
-    await expect(page.getByRole('heading', { name: 'Criar item' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Criar item/i })).toBeVisible();
 
-    const createItemPanel = page.locator('.panel').filter({ has: page.getByRole('heading', { name: 'Criar item' }) });
-    await createItemPanel.getByLabel('Nome').fill(ITEM_NAME);
-    await createItemPanel.getByLabel('SKU').fill(ITEM_SKU);
+    const createItemPanel = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: /Criar item/i }) });
+    await createItemPanel.getByLabel('Nome').fill(itemName);
+    await createItemPanel.getByLabel('SKU').fill(itemSku);
     await createItemPanel.getByLabel('Unidade').fill('kg');
     await createItemPanel.getByLabel(/Pre/).fill('10');
     await createItemPanel.getByLabel('Qtd inicial').fill('20');
     await createItemPanel.getByLabel(/Estoque minimo/i).fill('5');
     await createItemPanel.getByRole('button', { name: 'Criar item' }).click();
     await expect(page.getByText('Item criado com sucesso.')).toBeVisible();
-    await expectItemStock(page, /20/);
+    await expectItemStock(page, itemName, /20/);
 
     await openNav(page, '/products', async () => {
       await expect(page.getByRole('heading', { name: 'Produtos finais' })).toBeVisible();
     });
     await page.getByRole('button', { name: 'Criar produto' }).click();
-    await expect(page.getByRole('heading', { name: 'Criar produto' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Criar produto/i })).toBeVisible();
 
-    const createProductPanel = page.locator('.panel').filter({ has: page.getByRole('heading', { name: 'Criar produto' }) });
-    await createProductPanel.getByLabel('Nome').fill(PRODUCT_NAME);
-    await createProductPanel.getByLabel('SKU').fill(PRODUCT_SKU);
+    const createProductPanel = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: /Criar produto/i }) });
+    await createProductPanel.getByLabel('Nome').fill(productName);
+    await createProductPanel.getByLabel('SKU').fill(productSku);
     await createProductPanel.getByRole('button', { name: 'Criar produto' }).click();
     await expect(page.getByText('Produto criado com sucesso.')).toBeVisible();
 
-    const productRow = page.locator('tr', { hasText: PRODUCT_NAME }).first();
+    const productRow = page.locator('tr', { hasText: productName }).first();
     await productRow.getByRole('button', { name: 'Editar / BOM' }).click();
 
-    const editPanel = page.locator('.panel').filter({ has: page.getByRole('heading', { name: 'Editar produto / BOM' }) });
+    const editPanel = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: /Editar produto \/ BOM/i }) });
     await editPanel.getByRole('button', { name: 'Adicionar item' }).click();
     const bomRowPanel = editPanel.locator('.panel').last();
     await bomRowPanel.locator('select').selectOption({ index: 1 });
     await bomRowPanel.locator('input').first().fill('2.5');
     await editPanel.getByRole('button', { name: 'Salvar BOM' }).click();
     await expect(page.getByText('BOM salva com sucesso.')).toBeVisible();
-    await expect(editPanel).toContainText(ITEM_NAME);
+    await expect(editPanel).toContainText(itemName);
 
     await openNav(page, '/operations', async () => {
       await expect(page.getByRole('button', { name: 'Gerar preview' })).toBeVisible();
@@ -105,15 +119,15 @@ test.describe.serial('stock platform e2e', () => {
     const previewPanel = page.locator('.panel').filter({ hasText: 'Custo total' }).first();
     await expect(previewPanel).toContainText('50');
     await expect(previewPanel).toContainText('25');
-    await expect(previewPanel).toContainText(ITEM_NAME);
+    await expect(previewPanel).toContainText(itemName);
 
     await page.getByRole('button', { name: /Confirmar/ }).click();
     await expect(page.getByText(/sucesso/i)).toBeVisible();
 
     await openNav(page, '/items', async () => {
-      await expect(page.getByRole('heading', { name: 'Itens / Materia-prima' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Itens\s*\/\s*Mat/i })).toBeVisible();
     });
-    await expectItemStock(page, /15/);
+    await expectItemStock(page, itemName, /15/);
   });
 
   test('flow 2: inbound qty=3 credits stock', async ({ page }) => {
@@ -132,9 +146,11 @@ test.describe.serial('stock platform e2e', () => {
     await expect(page.getByText(/sucesso/i)).toBeVisible();
 
     await openNav(page, '/items', async () => {
-      await expect(page.getByRole('heading', { name: 'Itens / Materia-prima' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Itens\s*\/\s*Mat/i })).toBeVisible();
     });
-    await expectItemStock(page, /22[,.]5/);
+    const row = page.locator('tr', { hasText: createdItemName }).first();
+    await expect(row).toBeVisible();
+    await expect(row.locator('td').nth(4)).toContainText(/22[,.]5/);
   });
 
   test('flow 3: outbound without stock shows blocker and does not change stock', async ({ page }) => {
@@ -153,8 +169,10 @@ test.describe.serial('stock platform e2e', () => {
     await expect(page.getByRole('button', { name: /Confirmar/ })).toBeDisabled();
 
     await openNav(page, '/items', async () => {
-      await expect(page.getByRole('heading', { name: 'Itens / Materia-prima' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Itens\s*\/\s*Mat/i })).toBeVisible();
     });
-    await expectItemStock(page, /22[,.]5/);
+    const row = page.locator('tr', { hasText: createdItemName }).first();
+    await expect(row).toBeVisible();
+    await expect(row.locator('td').nth(4)).toContainText(/22[,.]5/);
   });
 });
