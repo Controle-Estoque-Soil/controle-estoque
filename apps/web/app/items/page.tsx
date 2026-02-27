@@ -595,7 +595,11 @@ export default function ItemsPage() {
                     const belowMin = item.minQty && Number(item.qtyOnHand) < Number(item.minQty);
                     return (
                       <tr key={item.id} className={belowMin ? 'table-row-below-min' : undefined}>
-                        <td>{item.name}</td>
+                        <td>
+                          <span className="table-cell-ellipsis" title={item.name}>
+                            {item.name}
+                          </span>
+                        </td>
                         <td>{item.sku}</td>
                         <td>{item.unit}</td>
                         <td>{formatDecimal(item.unitPrice)}</td>

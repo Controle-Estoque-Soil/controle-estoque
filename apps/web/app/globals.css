@@ -412,6 +412,15 @@ a {
   border-bottom: none;
 }
 
+.table-cell-ellipsis {
+  display: inline-block;
+  max-width: min(100%, 260px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
 .table tbody tr.table-row-selected {
   background: rgba(34, 197, 94, 0.08);
 }
